@@ -1,0 +1,4 @@
+pyppmd
+zstandard
+lz4
+crc

@@ -1,0 +1,15 @@
+SArc v0:
+
+all BE
+
+str   ("SArc") - magic
+uint8 (0)      - version
+uint8          - bytes used for size / n.o. files
+
+uintX - n.o. files
+per file:
+	strz   - file path
+	uint8  - compression enum
+	uintX  - size
+	raw[X] - compressed data
+	uint32 - CRC32 checksum of uncompressed data
