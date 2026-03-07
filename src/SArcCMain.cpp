@@ -1,3 +1,5 @@
+#include "SArc.hpp"
+
 #include <CLI/CLI.hpp>
 
 #include <string>
@@ -5,8 +7,11 @@
 int main(int argc, char* argv[]) {
 	CLI::App app;
 
-	std::string inFolder;
-	app.add_option("-if", inFolder, "Input Folder")->required();
+	std::string in_folder = ".";
+	app.add_option("-i", in_folder, "Input Folder")->required();
+
+	std::string out_file = "out.sarc";
+	app.add_option("-o", out_file, "Output File")->required();
 
 	CLI11_PARSE(app, argc, argv);
 

@@ -71,21 +71,21 @@ class SArchiveFile:
 	def __init__(self) -> None:
 		self.data = b""
 	
-	def serialize(self, int_length: int) -> bytes:
+	def serialize(self) -> bytes:
 		out = b""
 		
 		out += self.file_path.encode("utf-8")
 		out += b"\x00"
 		out += self.compression_type.to_bytes(1, "big")
 		comp = _compress_data(self.data, self.compression_type)
-		out += len(comp).to_bytes(int_length, "big")
+		out += len(comp).to_bytes(8, "big")
 		out += comp
 		out += _crcCalc(_crc32.CRC32, optimized=True).checksum(self.data).to_bytes(4, "big") # pyright: ignore[reportArgumentType]
 				
 		return out
 	
 	@staticmethod
-	def load(file: _bufReader, int_length: int) -> SArchiveFile:
+	def load(file: _bufReader) -> SArchiveFile:
 		self = SArchiveFile()
 		
 		buf = b""
@@ -97,7 +97,7 @@ class SArchiveFile:
 		
 		self.file_path = buf.decode("utf-8")
 		self.compression_type = SArcCompression.from_bytes(file.read(1), "big")
-		decomp = _decompress_data(file.read(int.from_bytes(file.read(int_length), "big")), self.compression_type)
+		decomp = _decompress_data(file.read(int.from_bytes(file.read(8), "big")), self.compression_type)
 		self.data = decomp
 		assert _crcCalc(_crc32.CRC32, optimized=True).verify(self.data, int.from_bytes(file.read(4), "big")) # pyright: ignore[reportArgumentType]
 		
@@ -105,7 +105,6 @@ class SArchiveFile:
 
 class SArchive:
 	files: list[SArchiveFile]
-	int_length: int = 1
  
 	def __init__(self) -> None:
 		self.files = []
@@ -113,11 +112,9 @@ class SArchive:
 	def serialize(self) -> bytes:
 		out = b"SArc\x00"
 
-		out += self.int_length.to_bytes(1, "big")
-
-		out += len(self.files).to_bytes(self.int_length, "big")
+		out += len(self.files).to_bytes(8, "big")
 		for file in self.files:
-			out += file.serialize(self.int_length)
+			out += file.serialize()
      
 		return out
 
@@ -126,10 +123,8 @@ class SArchive:
 		self = SArchive()
   
 		assert file.read(5) == b"SArc\x00"
-  
-		self.int_length = int.from_bytes(file.read(1), "big")
 
-		for i in range(int.from_bytes(file.read(self.int_length), "big")):
-			self.files.append(SArchiveFile.load(file, self.int_length))
+		for i in range(int.from_bytes(file.read(8), "big")):
+			self.files.append(SArchiveFile.load(file))
   
 		return self

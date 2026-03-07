@@ -8,11 +8,16 @@ project(SArc
 
 add_library(SArc STATIC)
 
-option(SARC_BUILD_EXEC "Build SArcC and SArcU executables" ON)
+target_include_directories(SArc PUBLIC include)
+
+option(SARC_BUILD_EXEC "Build SArc and UnSArc executables" ON)
 
 if(SARC_BUILD_EXEC)
 	add_executable(SArcC src/SArcCMain.cpp)
 	add_executable(SArcU src/SArcUMain.cpp)
+
+	set_target_properties(SArcC PROPERTIES RUNTIME_OUTPUT_NAME "SArc")
+	set_target_properties(SArcU PROPERTIES RUNTIME_OUTPUT_NAME "UnSArc")
 
 	target_link_libraries(SArcC PRIVATE SArc)
 	target_link_libraries(SArcU PRIVATE SArc)
