@@ -20,7 +20,7 @@ The format of SArc V0 goes as follows:
 - Version - 0x00
 - File count - UInt64
 - *Per file:*
-- - File path - Null-terminated UTF-8 string
+- - File path - Null-terminated UTF-8 string (use forward-slashes [/] to seperate folders)
 - - Compression type - SArcCompression
 - - Compressed data length - UInt64
 - - Compressed data

@@ -4,6 +4,8 @@
 
 #include <string>
 
+using namespace SArc;
+
 int main(int argc, char* argv[]) {
 	CLI::App app;
 
@@ -11,7 +13,7 @@ int main(int argc, char* argv[]) {
 	app.add_option("-i", in_file, "Input File")->required();
 
 	std::string out_folder = ".";
-	app.add_option("-o", out_folder, "Output Folder")->required();
+	app.add_option("-o", out_folder, "Output Folder")->default_str(".");
 
 	CLI11_PARSE(app, argc, argv);
 

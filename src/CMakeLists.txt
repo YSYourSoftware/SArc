@@ -1,0 +1,1 @@
+target_sources(SArc PUBLIC SArc.cpp)

@@ -4,11 +4,13 @@
 
 #include <string>
 
+using namespace SArc;
+
 int main(int argc, char* argv[]) {
 	CLI::App app;
 
 	std::string in_folder = ".";
-	app.add_option("-i", in_folder, "Input Folder")->required();
+	app.add_option("-i", in_folder, "Input Folder")->default_str(".");
 
 	std::string out_file = "out.sarc";
 	app.add_option("-o", out_file, "Output File")->required();
