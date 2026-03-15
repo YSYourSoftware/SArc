@@ -1,16 +1,12 @@
 #pragma once
 
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace SArc {
 	typedef std::vector<std::byte> bytes_t;
-
-	char *bytes_to_buffer(const bytes_t &bytes);
 
 	enum SArcCompression {
 		NONE = 0,
@@ -26,21 +22,21 @@ namespace SArc {
 		public:
 			SArchiveFile() = default;
 			explicit SArchiveFile(SArcCompression compression_type);
-			explicit SArchiveFile(const bytes_t &data, SArcCompression compression_type = SArcCompression::NONE);
-			explicit SArchiveFile(const std::filesystem::path &path, SArcCompression compression_type = SArcCompression::NONE);
-			explicit SArchiveFile(std::ifstream &file, SArcCompression compression_type = SArcCompression::NONE);
+			explicit SArchiveFile(const bytes_t &data, SArcCompression compression_type = NONE);
+			explicit SArchiveFile(const std::filesystem::path &path, SArcCompression compression_type = NONE);
+			explicit SArchiveFile(std::ifstream &file, SArcCompression compression_type = NONE);
 
-			bytes_t serialize();
+			bytes_t serialize() const;
 
 			void move_file(const std::string &new_path);
 
 			void set_compression_type(SArcCompression compression_type);
-			float get_compression_ratio(SArcCompression compression_type);
+			float get_compression_ratio(SArcCompression compression_type) const;
 
-			bytes_t get_decompressed_data();
+			bytes_t get_decompressed_data() const;
 		private:
 			std::string m_file_path;
-			SArcCompression m_compression_type = SArcCompression::NONE;
+			SArcCompression m_compression_type = NONE;
 			bytes_t m_compressed_data;
 	};
 
@@ -51,10 +47,10 @@ namespace SArc {
 			explicit SArchive(const std::filesystem::path &path);
 			explicit SArchive(std::ifstream &file);
 
-			bytes_t serialize();
+			bytes_t serialize() const;
 
-			SArchiveFile &get_file_by_path(const std::string &path);
-			std::vector<SArchiveFile> get_files();
+			SArchiveFile &get_file_by_path(const std::string &path) const;
+			std::vector<SArchiveFile> get_files() const;
 
 			void add_file(SArchiveFile file);
 		private:
