@@ -4,7 +4,6 @@ from enum import IntEnum as _ienum
 from io import BufferedReader as _bufReader
 
 import deflate as _deflate
-import pyppmd as _ppm
 import lzma as _lzma
 import zstandard as _zstd
 import lz4.frame as _lz4
@@ -16,7 +15,6 @@ from crc import Calculator as _crcCalc
 class SArcCompression(_ienum):
 	NONE = 0
 	DEFLATE = 1
-	PPM = 2
 	LZMA = 3
 	ZSTD = 4
 	LZ4 = 5
@@ -29,8 +27,6 @@ def _compress_data(data: bytes, compression_type: SArcCompression) -> bytes:
 		case SArcCompression.DEFLATE:
 			osz = len(data).to_bytes(4, "big")
 			return osz + _deflate.deflate_compress(data)
-		case SArcCompression.PPM:
-			return _ppm.compress(data)
 		case SArcCompression.LZMA:
 			return _lzma.compress(data)
 		case SArcCompression.ZSTD:

@@ -10,8 +10,6 @@ bytes_t compress(const bytes_t &data, const SArcCompression compression_type) {
 			return data;
 		case DEFLATE:
 			break;
-		case PPM:
-			break;
 		case LZMA:
 			break;
 		case ZSTD:

@@ -11,7 +11,6 @@ namespace SArc {
 	enum SArcCompression {
 		NONE = 0,
 		DEFLATE = 1,
-		PPM = 2,
 		LZMA = 3,
 		ZSTD = 4,
 		LZ4 = 5,
