@@ -1,15 +1,11 @@
 # SArc
 
 SArc is a simple archive format used primarily in [YourSoftware](https://github.com/YSYourSoftware) applications.
-It officially supports 5 compression formats:
-- Deflate
-- LZMA
+It currently officially supports 1 compression format:
 - Zstandard
-- LZ4
-- BZIP2
 
 > [!NOTE]
-> PPM Compresion was dropped in v1.
+> All other compression schemes were dropped in v1.
 > Any archives still using it will need to be repacked. See [Repacking & Updating](https://github.com/YSYourSoftware/SArc?tab=readme-ov-file#repacking--updating-archives) for more details.
 
 ## Format
@@ -24,7 +20,6 @@ The format of SArc v1 goes as follows:
 - File count - `UInt64`
 - *Per file:*
 - - File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
-- - Compression type - `SArcCompression`
 - - Compressed data length - `UInt64`
 - - Compressed data
 - - CRC32 checksum - `UInt32`
@@ -42,16 +37,10 @@ SArc
 # Provide input and output paths:
 SArc   -i <input folder>  -o <output archive>
 UnSArc -i <input archive> -o <output folder>
-
-# Provide a compression scheme:
-SArc -c DEFLATE
-
-# Use the best compression scheme (can take a while as we have to try every scheme for every file)
-SArc --best-comp
 ```
 
 > [!NOTE]
-> `SArc` does not currently support assigning different compression schemes to each file
+> `SArc` does not currently support assigning different compression schemes to each file.
 
 ## Repacking & Updating Archives
 
@@ -59,6 +48,6 @@ Different versions of SArc will introduce breaking changes, and therefore preven
 To combat this, you will need to unpack an archive using the `UnSArc` executable from the version it was created with, and repack it with the `SArc` executable of the new version.
 
 > [!TIP]
-> You can also do this to switch compression types.
+> You can also do this to switch compression schemes.
 
 There is also a [web tool](https://YourSoftware.org/projects/SArc/archive-updater) which supports every version of SArc (excluding v0).

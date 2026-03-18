@@ -8,37 +8,53 @@
 namespace SArc {
 	typedef std::vector<std::byte> bytes_t;
 
-	enum SArcCompression {
-		NONE = 0,
-		DEFLATE = 1,
-		LZMA = 3,
-		ZSTD = 4,
-		LZ4 = 5,
-		BZIP2 = 6
-	};
-
+	/**
+	* <summary>
+	* A file stored within a <c>SArchive</c>.
+	* </summary>
+	*/
 	class SArchiveFile {
 		public:
 			SArchiveFile() = default;
-			explicit SArchiveFile(SArcCompression compression_type);
-			explicit SArchiveFile(const bytes_t &data, SArcCompression compression_type = NONE);
-			explicit SArchiveFile(const std::filesystem::path &path, SArcCompression compression_type = NONE);
-			explicit SArchiveFile(std::ifstream &file, SArcCompression compression_type = NONE);
 
-			bytes_t serialize() const;
+			/**
+			 * <summary>
+			 * Initialise with a specified data vector (will be copied!).
+			 * </summary>
+			 *
+			 * @param data Data vector to <b>copy</b> to the new <c>SArchiveFile</c>
+			 */
+			explicit SArchiveFile(const bytes_t &data);
 
-			void move_file(const std::string &new_path);
+			/**
+			 * <summary>
+			 * Initialise using data from a file.
+			 * </summary>
+			 *
+			 * @param path Path of file to read into data vector
+			 */
+			explicit SArchiveFile(const std::filesystem::path &path);
 
-			void set_compression_type(SArcCompression compression_type);
-			float get_compression_ratio(SArcCompression compression_type) const;
+			/**
+			 * <summary>
+			 * Initialise using data from a stream.
+			 * </summary>
+			 *
+			 * @param stream Input stream to read into data vector
+			 */
+			explicit SArchiveFile(std::istream &stream);
 
-			bytes_t get_decompressed_data() const;
+			[[nodiscard]] bytes_t serialize() const;
+
+			bytes_t data;
+			std::string file_path;
 		private:
-			std::string m_file_path;
-			SArcCompression m_compression_type = NONE;
-			bytes_t m_compressed_data;
 	};
 
+	/**
+	 * <summary>
+	 * </summary>
+	 */
 	class SArchive {
 		public:
 			SArchive() = default;
@@ -46,10 +62,10 @@ namespace SArc {
 			explicit SArchive(const std::filesystem::path &path);
 			explicit SArchive(std::ifstream &file);
 
-			bytes_t serialize() const;
+			[[nodiscard]] bytes_t serialize() const;
 
-			SArchiveFile &get_file_by_path(const std::string &path) const;
-			std::vector<SArchiveFile> get_files() const;
+			[[nodiscard]] SArchiveFile &get_file_by_path(const std::string &path) const;
+			[[nodiscard]] std::vector<SArchiveFile> get_files() const;
 
 			void add_file(SArchiveFile file);
 		private:

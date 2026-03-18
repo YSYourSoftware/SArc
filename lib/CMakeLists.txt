@@ -8,3 +8,5 @@ if(SARC_BUILD_EXEC)
 	target_link_libraries(SArcU PRIVATE CLI11::CLI11)
 	target_include_directories(SArcU PRIVATE CLI11/include)
 endif()
+
+add_subdirectory(libarchive)

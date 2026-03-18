@@ -1,4 +1,2 @@
 zstandard
-lz4
 crc
-deflate
