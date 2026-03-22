@@ -1,1 +1,4 @@
-target_sources(SArc PUBLIC SArc.cpp)
+target_sources(SArc PUBLIC
+	SArc.cpp
+	Helpers.cpp
+)

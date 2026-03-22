@@ -1,6 +1,9 @@
 [submodule "lib/CLI11"]
 	path = lib/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
-[submodule "lib/libarchive"]
-	path = lib/libarchive
-	url = https://github.com/libarchive/libarchive.git
+[submodule "lib/utfcpp"]
+	path = lib/utfcpp
+	url = https://github.com/nemtrif/utfcpp.git
+[submodule "lib/crc-checksum"]
+	path = lib/crc-checksum
+	url = https://github.com/panzi/CRC-and-checksum-functions.git

@@ -1,12 +1,12 @@
 # SArc
 
-SArc is a simple archive format used primarily in [YourSoftware](https://github.com/YSYourSoftware) applications.
+SArc is a simple archive format used primarily in [YourSoftware](https://YourSoftware.org) applications.
 It currently officially supports 1 compression format:
-- Zstandard
+- LZMA
 
 > [!NOTE]
 > All other compression schemes were dropped in v1.
-> Any archives still using it will need to be repacked. See [Repacking & Updating](https://github.com/YSYourSoftware/SArc?tab=readme-ov-file#repacking--updating-archives) for more details.
+> Any archives still using it will need to be repacked. See [Repacking & Updating](#repacking--updating-archives) for more details.
 
 ## Format
 
@@ -15,14 +15,16 @@ It currently officially supports 1 compression format:
 
 The format of SArc v1 goes as follows: 
 
-- Magic value - ASCII `SArc`
+- Magic value - `0x53417263` (SArc)
 - Version - `0x01`
-- File count - `UInt64`
+- File count - `UInt32`
+- CRC32 checksum of decompressed data - `UInt32`
+- Size of decompressed data - `UInt64`
+- *All data from here onwards is compressed*
 - *Per file:*
 - - File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
-- - Compressed data length - `UInt64`
-- - Compressed data
-- - CRC32 checksum - `UInt32`
+- - Data length - `UInt32`
+- - Data
 
 ## Creating & Unpacking Archives
 
@@ -39,8 +41,8 @@ SArc   -i <input folder>  -o <output archive>
 UnSArc -i <input archive> -o <output folder>
 ```
 
-> [!NOTE]
-> `SArc` does not currently support assigning different compression schemes to each file.
+> [!TIP]
+> SArc has a 7-Zip plugin, called [7-SArc](https://github.com/YSYourSoftware/7-SArc).
 
 ## Repacking & Updating Archives
 

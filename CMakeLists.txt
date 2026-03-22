@@ -1,16 +1,21 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.15)
 
 project(SArc
 	VERSION 1.0.0
-	DESCRIPTION "SArc Compression in C++"
+	DESCRIPTION "Sam's Archive Format (SArc) support in C++"
 	LANGUAGES CXX C
 )
 
-add_library(SArc STATIC)
+option(SARC_BUILD_SHARED "Build SArc as a shared library" OFF)
+option(SARC_BUILD_EXEC "Build SArc and UnSArc executables" ON)
+
+if(SARC_BUILD_SHARED)
+	add_library(SArc SHARED)
+else()
+	add_library(SArc STATIC)
+endif()
 
 target_include_directories(SArc PUBLIC include)
-
-option(SARC_BUILD_EXEC "Build SArc and UnSArc executables" ON)
 
 if(SARC_BUILD_EXEC)
 	add_executable(SArcC src/SArcCMain.cpp)
@@ -21,6 +26,9 @@ if(SARC_BUILD_EXEC)
 
 	target_link_libraries(SArcC PRIVATE SArc)
 	target_link_libraries(SArcU PRIVATE SArc)
+
+	target_compile_features(SArcC PUBLIC cxx_std_23)
+	target_compile_features(SArcU PUBLIC cxx_std_23)
 endif()
 
 add_subdirectory(lib)

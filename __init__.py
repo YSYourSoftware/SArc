@@ -1,8 +1,12 @@
+# This is using an older, edited version of the v0 decoder.
+# It will not function on any SArc archives at this time.
+# TODO: Rewrite for SArc v1
+
 from __future__ import annotations
 
 from io import BufferedReader as _bufReader
 
-import zstandard as _zstd
+import lzma as _lzma
 
 from crc import Crc32 as _crc32
 from crc import Calculator as _crcCalc
@@ -19,8 +23,8 @@ class SArchiveFile:
 		
 		out += self.file_path.encode("utf-8")
 		out += b"\x00"
-		comp = _zstd.compress(self.data)
-		out += len(comp).to_bytes(8, "big")
+		comp = _lzma.compress(self.data, _lzma.FORMAT_RAW)
+		out += len(comp).to_bytes(4, "big")
 		out += comp
 		out += _crcCalc(_crc32.CRC32, optimized=True).checksum(self.data).to_bytes(4, "big") # pyright: ignore[reportArgumentType]
 				
@@ -38,7 +42,7 @@ class SArchiveFile:
 			buf += b
 		
 		self.file_path = buf.decode("utf-8")
-		decomp = _zstd.decompress(file.read(int.from_bytes(file.read(8), "big")))
+		decomp = _lzma.decompress(file.read(int.from_bytes(file.read(4), "big")), _lzma.FORMAT_RAW)
 		self.data = decomp
 		assert _crcCalc(_crc32.CRC32, optimized=True).verify(self.data, int.from_bytes(file.read(4), "big")) # pyright: ignore[reportArgumentType]
 		
@@ -53,7 +57,7 @@ class SArchive:
 	def serialize(self) -> bytes:
 		out = b"SArc\x01"
 
-		out += len(self.files).to_bytes(8, "big")
+		out += len(self.files).to_bytes(4, "big")
 		for file in self.files:
 			out += file.serialize()
      
@@ -65,7 +69,7 @@ class SArchive:
   
 		assert file.read(5) == b"SArc\x01"
 
-		for i in range(int.from_bytes(file.read(8), "big")):
+		for i in range(int.from_bytes(file.read(4), "big")):
 			self.files.append(SArchiveFile.load(file))
   
 		return self
