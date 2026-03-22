@@ -1,4 +1,6 @@
 target_sources(SArc PUBLIC
-	SArc.cpp
 	Helpers.cpp
+	SArchive.cpp
+	SArchiveFile.cpp
+	SArchiveStream.cpp
 )

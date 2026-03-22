@@ -104,7 +104,7 @@ std::string helpers::retrieve_null_terminated_utf8(const byte_span_const_t &byte
 		result.push_back(static_cast<char>(c));
 	}
 
-	if (!utf8::is_valid(result.begin(), result.end())) throw std::runtime_error("Buffer contained invalid UTF-8");
+	if (!utf8::is_valid(result.begin(), result.end())) throw std::runtime_error("Buffer contained invalid UTF-8\n(string: " + result + ")");
 
 	return result;
 }

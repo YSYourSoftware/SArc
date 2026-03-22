@@ -87,7 +87,7 @@ namespace SArc {
 			 * @param stream Input stream to read into data vector
 			 * @param size Number of bytes to read from input stream
 			 */
-			explicit SArchiveFile(std::istream &stream, const std::size_t size);
+			explicit SArchiveFile(std::istream &stream, size_t size);
 
 			/**
 			 * <summary>
@@ -153,6 +153,17 @@ namespace SArc {
 			 * @returns Byte vector of serialised data
 			 */
 			[[nodiscard]] bytes_t serialise(uint8_t compression_level, CompressStats *compression_stats=nullptr) const;
+
+			/**
+			 * <summary>
+			 * Serialise this archive and all its files to a stream.
+			 * </summary>
+			 *
+			 * @param compression_level LZMA compression level (0-9)
+			 * @param stream Output data stream to write to
+			 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
+			 */
+			void serialise_to_stream(uint8_t compression_level, std::ostream &stream, CompressStats *compression_stats=nullptr) const;
 
 			/**
 			 * <summary>
@@ -228,6 +239,15 @@ namespace SArc {
 			 * @throws file_not_found_error if file is not found in this archive
 			 */
 			void delete_file(const std::string &path);
+
+			/**
+			 * <summary>
+			 * Check if this archive is being streamed.
+			 * </summary>
+			 *
+			 * @return <c>true</c> if this archive is a <c>SArchiveStream</c>, otherwise <c>false</c>
+			 */
+			bool is_stream() {return false;}
 		private:
 			std::unordered_map<std::string, SArchiveFile> m_files;
 			void load_from_serialised(const bytes_t &serialised);

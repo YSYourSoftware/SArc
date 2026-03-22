@@ -14,3 +14,4 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 ## Library Features
 
 - [ ] `SArchiveStream` class to stream archives from the disk or network
+- [ ] Rewrite base in C and provide a C++ wrapper

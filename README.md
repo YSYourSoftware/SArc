@@ -55,3 +55,24 @@ To combat this, you will need to unpack an archive using the `UnSArc` executable
 > You can also do this to switch compression schemes.
 
 There is also a [web tool](https://YourSoftware.org/projects/SArc/archive-updater) which supports every version of SArc (excluding v0).
+
+## Extensions
+
+Extensions are a way to increase the functionality of SArc. They are provided as extra headers / files, usually in a subfolder called `SArc`.
+
+### Streaming
+
+Allows streaming of archives from the disk or the network. Streaming large archives can help reduce memory usage.
+
+```cpp
+// C++ Demo for SArc streaming extension
+#include <SArc/Streaming.hpp>
+
+using namespace SArc;
+
+SArchiveStream stream("archive.sarc"); // Stream an archive from a file
+SArchiveFile &my_file = stream.get_file_by_path("hello_world.txt");
+
+void archive_magic(SArchive &archive);
+archive_magic(stream); // SArchiveStream inherits SArchive
+```

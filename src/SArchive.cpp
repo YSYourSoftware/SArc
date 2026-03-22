@@ -1,35 +1,10 @@
 #include "SArc.hpp"
 
-#include "SArc/Helpers.hpp"
-#include "SArc/TermColour.hpp"
+#include "Sarc/Helpers.hpp"
 
-#include <fstream>
-#include <iostream>
-#include <iterator>
 #include <ranges>
-#include <utility>
 
 using namespace SArc;
-
-#pragma region SArchiveFile
-
-SArchiveFile::SArchiveFile(bytes_t data) : data(std::move(data)) {}
-SArchiveFile::SArchiveFile(const bytes_t &data, const size_t size, const size_t offset) : data(data | std::ranges::views::drop(offset) | std::ranges::views::take(size) | std::ranges::to<bytes_t>()) {}
-SArchiveFile::SArchiveFile(const std::filesystem::path &path) : data(helpers::read_file(path)) {}
-SArchiveFile::SArchiveFile(std::istream &stream, const std::size_t size) {
-	this->data.resize(size);
-	SARC_RUNTIME_ASSERT(stream.read(reinterpret_cast<char*>(this->data.data()), size), io_error, "Failed to read from stream");
-}
-
-void SArchiveFile::serialise_append(bytes_t &bytes) const {
-	if (this->data.size() > UINT32_MAX) throw std::overflow_error("Size of data vector larger than UINT32_MAX");
-
-	helpers::emplace_multibyte<uint32_t>(bytes, this->data.size());
-	bytes.insert(bytes.end(), this->data.begin(), this->data.end());
-}
-
-#pragma endregion
-#pragma region SArchive
 
 SArchive::SArchive(const bytes_t &serialised) {this->load_from_serialised(serialised);}
 SArchive::SArchive(const std::filesystem::path &path) {this->load_from_serialised(helpers::read_file(path));}
@@ -41,7 +16,7 @@ SArchive::SArchive(std::istream &stream, const std::size_t size) {
 
 bytes_t SArchive::serialise(const uint8_t compression_level, CompressStats *compression_stats) const {
 	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument, "Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
-	
+
 	bytes_t serialised;
 	serialised.reserve(
 		4 // SArc magic        [uint32_t]
@@ -157,4 +132,3 @@ void SArchive::load_from_serialised(const bytes_t &serialised) {
 		this->add_file(SArchiveFile{decompressed, file_size, offset}, file_path);
 	}
 }
-#pragma endregion
