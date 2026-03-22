@@ -1,7 +1,7 @@
 # SArc Future Features
 
 Below is a list of all features that will be added to SArc, and the versions they will be added in.
-If you have a feature suggestion, feel free to [submit an issue](/issues/new).
+If you have a feature suggestion, feel free to [submit an issue](https://github.com/YSYourSoftware/SArc/issues/new).
 
 ## Version 2
 

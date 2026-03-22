@@ -6,7 +6,6 @@ It currently officially supports 1 compression format:
 
 > [!NOTE]
 > All other compression schemes were dropped in v1.
-> Any archives still using it will need to be repacked. See [Repacking & Updating](#repacking--updating-archives) for more details.
 
 ## Format
 
@@ -28,7 +27,7 @@ The format of SArc v1 goes as follows:
 
 ## Creating & Unpacking Archives
 
-It would not be user-friendly if, every time you wanted to create or unpack an archive, you had to write a python script, so, `SArc` and `UnSArc` are provided for you to download.
+`SArc` and `UnSArc` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
 
 These are simple packer and unpacker command-line executables.
 
@@ -37,8 +36,11 @@ These are simple packer and unpacker command-line executables.
 SArc
 
 # Provide input and output paths:
-SArc   -i <input folder>  -o <output archive>
-UnSArc -i <input archive> -o <output folder>
+SArc    <input folder>   <output archive>
+UnSArc  <input archive>  <output folder>
+
+# Provide a compression level
+SArc -c <compression level>
 ```
 
 > [!TIP]
