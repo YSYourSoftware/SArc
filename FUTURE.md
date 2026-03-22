@@ -15,3 +15,7 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 
 - [ ] `SArchiveStream` class to stream archives from the disk or network
 - [ ] Rewrite base in C and provide a C++ wrapper
+
+## Extra features
+
+- [ ] SArc debugger / fixer tool

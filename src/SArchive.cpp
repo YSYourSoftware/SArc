@@ -2,6 +2,7 @@
 
 #include "Sarc/Helpers.hpp"
 
+#include <iostream>
 #include <ranges>
 
 using namespace SArc;
@@ -127,8 +128,8 @@ void SArchive::load_from_serialised(const bytes_t &serialised) {
 	offset = 0;
 	for (int i = 0; i < file_count; ++i) {
 		const std::string file_path = helpers::retrieve_null_terminated_utf8(decompressed, offset); offset += file_path.size() + 1;
-		const uint32_t file_size = helpers::retrieve_multibyte<uint32_t>(decompressed, offset); offset += 4;
+		const auto file_size = helpers::retrieve_multibyte<uint32_t>(decompressed, offset); offset += 4;
 
-		this->add_file(SArchiveFile{decompressed, file_size, offset}, file_path);
+		this->add_file(SArchiveFile{decompressed, file_size, offset}, file_path); offset += file_size;
 	}
 }

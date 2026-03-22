@@ -1,0 +1,1 @@
+streamed reader should maintain a map of file names to their offsets in the streams and when trying to find a file, should note down the offset of every file it goes past.
