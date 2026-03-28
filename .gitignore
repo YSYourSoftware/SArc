@@ -4,5 +4,5 @@
 
 build/
 
-out.sarc
+*.sarc
 *.exe
