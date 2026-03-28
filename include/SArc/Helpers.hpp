@@ -31,9 +31,11 @@ namespace SArc::helpers {
 
 	bytes_t read_file(const std::filesystem::path &path);
 
+	size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
 	bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
 	bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
 
+	inline size_t lzma_get_compressed_size(const bytes_t &data, const uint8_t level = 5) {return lzma_get_compressed_size(std::span(data), level);}
 	inline bytes_t lzma_compress(const bytes_t &data, const uint8_t level = 5) {return lzma_compress(std::span(data), level);}
 	inline bytes_t lzma_decompress(const bytes_t &data, const size_t decompressed_size) {return lzma_decompress(std::span(data), decompressed_size);}
 

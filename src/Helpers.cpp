@@ -22,6 +22,44 @@ bytes_t helpers::read_file(const std::filesystem::path &path) {
 	return buffer;
 }
 
+size_t helpers::lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level) {
+	size_t compressed_size = data.size() + data.size() / 3 + 128;
+
+	uint8_t props[LZMA_PROPS_SIZE];
+	size_t props_size = LZMA_PROPS_SIZE;
+
+	bytes_t compressed(props_size + compressed_size);
+
+	int result = LzmaCompress(
+		reinterpret_cast<Byte*>(compressed.data() + props_size), &compressed_size,
+		reinterpret_cast<const Byte*>(data.data()), data.size(),
+		props, &props_size,
+		level,
+		0, -1, -1, -1, -1, -1
+	);
+
+	if (result == SZ_ERROR_OUTPUT_EOF) {
+		compressed_size = data.size();
+		compressed.resize(props_size + compressed_size);
+
+		result = LzmaCompress(
+			reinterpret_cast<Byte*>(compressed.data() + props_size), &compressed_size,
+			reinterpret_cast<const Byte*>(data.data()), data.size(),
+			props, &props_size,
+			level,
+			0, -1, -1, -1, -1, -1
+		);
+	}
+
+	if (result == SZ_ERROR_MEM)        throw memory_error("LZMA: Memory allocation error");
+	if (result == SZ_ERROR_PARAM)      throw std::invalid_argument("LZMA: Invalid parameters");
+	if (result == SZ_ERROR_OUTPUT_EOF) throw memory_error("LZMA: Compressed data too large (try a higher compression level)");
+	if (result == SZ_ERROR_THREAD)     throw thread_error("LZMA: Error in multithreading funcitons");
+	if (result != SZ_OK)               throw std::runtime_error("LZMA: Unknown error in compression");
+
+	return props_size + compressed_size;
+}
+
 bytes_t helpers::lzma_compress(const byte_span_const_t &data, const uint8_t level) {
 	size_t compressed_size = data.size() + data.size() / 3 + 128;
 
