@@ -40,7 +40,7 @@ int main(const int argc, char *argv[]) {
 		uint32_t i = 0;
 		for (const auto &entry : std::filesystem::recursive_directory_iterator(in_folder, dir_options)) {
 			if (!entry.is_regular_file()) continue;
-			std::string entry_path = std::filesystem::relative(entry.path(), in_folder).string();
+			std::string entry_path = std::filesystem::relative(entry.path(), in_folder).generic_string();
 			std::ranges::replace(entry_path, '\\', '/');
 			std::cout << std::format("[" STC_BLUE "{}/{}" STC_RESET "] ", ++i, file_count) << entry_path << std::endl;
 			archive.add_file(SArchiveFile{entry.path()}, entry_path);
