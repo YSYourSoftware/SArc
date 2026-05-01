@@ -3,4 +3,6 @@ target_sources(SArc PUBLIC
 	SArchive.cpp
 	SArchiveFile.cpp
 	SArchiveStream.cpp
+
+	SArchive.c
 )

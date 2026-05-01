@@ -7,6 +7,10 @@ It currently officially supports 1 compression format:
 > [!NOTE]
 > All other compression schemes were dropped in v1.
 
+## NEW: Multi-language support
+
+For native support in multiple languages, see other branches. The `main` brain will still remain the C/C++ branch. 
+
 ## Format
 
 > [!NOTE]
