@@ -7,3 +7,6 @@
 [submodule "lib/crc-checksum"]
 	path = lib/crc-checksum
 	url = https://github.com/panzi/CRC-and-checksum-functions.git
+[submodule "lib/rnp"]
+	path = lib/rnp
+	url = https://github.com/rnpgp/rnp.git

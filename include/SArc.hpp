@@ -6,16 +6,17 @@
 #include <unordered_map>
 #include <vector>
 
-#define SARC_ADD_RUNTIME_ERROR(name) \
-	class name : public std::runtime_error { \
-		public: \
-			explicit name(const std::string &message) : std::runtime_error(message) {} \
-			explicit name(const char *message) : std::runtime_error(message) {} \
+#define SARC_ADD_RUNTIME_ERROR(name)                                                                                   \
+	class name : public std::runtime_error {                                                                           \
+	public:                                                                                                            \
+		explicit name(const std::string &message) : std::runtime_error(message) {}                                     \
+		explicit name(const char *message) : std::runtime_error(message) {}                                            \
 	}
 
-#define SARC_RUNTIME_ASSERT(condition, error_type, message) do { \
-	if (!(condition)) throw error_type(message); \
-} while(0)
+#define SARC_RUNTIME_ASSERT(condition, error_type, message)                                                            \
+	do {                                                                                                               \
+		if (!(condition)) throw error_type(message);                                                                   \
+	} while (0)
 
 namespace SArc {
 	constexpr uint32_t SARC_MAGIC = 0x53417263; // "SArc" in ASCII
@@ -42,68 +43,68 @@ namespace SArc {
 	};
 
 	/**
-	* <summary>
-	* A file stored within a <c>SArchive</c>.
-	* </summary>
-	*/
+	 * <summary>
+	 * A file stored within a <c>SArchive</c>.
+	 * </summary>
+	 */
 	class SArchiveFile {
-		public:
-			SArchiveFile() = default;
+	public:
+		SArchiveFile() = default;
 
-			/**
-			 * <summary>
-			 * Initialise with a specified data vector.
-			 * </summary>
-			 *
-			 * @param data Data vector of the new <c>SArchiveFile</c>
-			 */
-			explicit SArchiveFile(bytes_t data);
+		/**
+		 * <summary>
+		 * Initialise with a specified data vector.
+		 * </summary>
+		 *
+		 * @param data Data vector of the new <c>SArchiveFile</c>
+		 */
+		explicit SArchiveFile(bytes_t data);
 
-			/**
-			 * <summary>
-			 * Initialise using a part of a specified data vector (part will be copied!).
-			 * </summary>
-			 *
-			 * @param data Data vector to <b>copy a part of</b> to the new <c>SArchiveFile</c>
-			 * @param size Size of data to copy
-			 * @param offset Offset of data to copy
-			 */
-			explicit SArchiveFile(const bytes_t &data, size_t size, size_t offset);
+		/**
+		 * <summary>
+		 * Initialise using a part of a specified data vector (part will be copied!).
+		 * </summary>
+		 *
+		 * @param data Data vector to <b>copy a part of</b> to the new <c>SArchiveFile</c>
+		 * @param size Size of data to copy
+		 * @param offset Offset of data to copy
+		 */
+		explicit SArchiveFile(const bytes_t &data, size_t size, size_t offset);
 
-			/**
-			 * <summary>
-			 * Initialise using data from a file.
-			 * </summary>
-			 *
-			 * @param path Path of file to read into data vector
-			 */
-			explicit SArchiveFile(const std::filesystem::path &path);
+		/**
+		 * <summary>
+		 * Initialise using data from a file.
+		 * </summary>
+		 *
+		 * @param path Path of file to read into data vector
+		 */
+		explicit SArchiveFile(const std::filesystem::path &path);
 
-			/**
-			 * <summary>
-			 * Initialise using data from a stream.
-			 * </summary>
-			 *
-			 * @param stream Input stream to read into data vector
-			 * @param size Number of bytes to read from input stream
-			 */
-			explicit SArchiveFile(std::istream &stream, size_t size);
+		/**
+		 * <summary>
+		 * Initialise using data from a stream.
+		 * </summary>
+		 *
+		 * @param stream Input stream to read into data vector
+		 * @param size Number of bytes to read from input stream
+		 */
+		explicit SArchiveFile(std::istream &stream, size_t size);
 
-			/**
-			 * <summary>
-			 * Append the serialised data of this file to a data vector.
-			 * </summary>
-			 *
-			 * @param bytes Reference to data vector
-			 */
-			void serialise_append(bytes_t &bytes) const;
+		/**
+		 * <summary>
+		 * Append the serialised data of this file to a data vector.
+		 * </summary>
+		 *
+		 * @param bytes Reference to data vector
+		 */
+		void serialise_append(bytes_t &bytes) const;
 
-			/**
-			 * <summary>
-			 * Data vector used by this file.
-			 * </summary>
-			 */
-			bytes_t data;
+		/**
+		 * <summary>
+		 * Data vector used by this file.
+		 * </summary>
+		 */
+		bytes_t data;
 	};
 
 	/**
@@ -112,144 +113,118 @@ namespace SArc {
 	 * </summary>
 	 */
 	class SArchive {
-		public:
-			SArchive() = default;
+	public:
+		virtual ~SArchive() = default;
 
-			/**
-			 * <summary>
-			 * Initialise from serialised data.
-			 * </summary>
-			 *
-			 * @param serialised Serialised data to load
-			 */
-			explicit SArchive(const bytes_t &serialised);
+		/**
+		 * <summary>
+		 * Serialise this archive and all its files ready to write to disk.
+		 * </summary>
+		 *
+		 * @param compression_level LZMA compression level (0-9)
+		 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
+		 * @returns Byte vector of serialised data
+		 */
+		[[nodiscard]] virtual bytes_t serialise(uint8_t compression_level, CompressStats *compression_stats) const = 0;
 
-			/**
-			 * <summary>
-			 * Initliase from serialised data in a file.
-			 * </summary>
-			 *
-			 * @param path Path of file with serialised data
-			 */
-			explicit SArchive(const std::filesystem::path &path);
+		/**
+		 * <summary>
+		 * Serialise this archive and all its files to a stream.
+		 * </summary>
+		 *
+		 * @param compression_level LZMA compression level (0-9)
+		 * @param stream Output data stream to write to
+		 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
+		 */
+		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream,
+								 CompressStats *compression_stats) const = 0;
 
-			/**
-			 * <summary>
-			 * Initialise using serialised data from a stream.
-			 * </summary>
-			 *
-			 * @param stream Input stream of serialised data
-			 * @param size Number of bytes to read from input stream
-			 */
-			explicit SArchive(std::istream &stream, std::size_t size);
+		/**
+		 * <summary>
+		 * Retrive a file by its path.
+		 * </summary>
+		 *
+		 * @param path Path of file to find
+		 * @returns Reference to file
+		 * @throws file_not_found_error if file is not found in this archive
+		 */
+		[[nodiscard]] virtual SArchiveFile &get_file_by_path(const std::string &path) = 0;
 
-			/**
-			 * <summary>
-			 * Serialise this archive and all its files ready to write to disk.
-			 * </summary>
-			 *
-			 * @param compression_level LZMA compression level (0-9)
-			 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
-			 * @returns Byte vector of serialised data
-			 */
-			[[nodiscard]] bytes_t serialise(uint8_t compression_level, CompressStats *compression_stats=nullptr) const;
+		/**
+		 * <summary>
+		 * Retrive a file by its path (read-only).
+		 * </summary>
+		 *
+		 * @param path Path of file to find
+		 * @returns <c>const</c> reference to file
+		 * @throws file_not_found_error if file is not found in this archive
+		 */
+		[[nodiscard]] virtual SArchiveFile &get_file_by_path(const std::string &path) const = 0;
 
-			/**
-			 * <summary>
-			 * Serialise this archive and all its files to a stream.
-			 * </summary>
-			 *
-			 * @param compression_level LZMA compression level (0-9)
-			 * @param stream Output data stream to write to
-			 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
-			 */
-			void serialise_to_stream(uint8_t compression_level, std::ostream &stream, CompressStats *compression_stats=nullptr) const;
+		/**
+		 * <summary>
+		 * Get the path of every file in this archive.
+		 * </summary>
+		 *
+		 * @returns Vector containing all file paths
+		 */
+		[[nodiscard]] virtual std::vector<std::string> get_all_paths() const = 0;
 
-			/**
-			 * <summary>
-			 * Retrive a file by its path.
-			 * </summary>
-			 *
-			 * @param path Path of file to find
-			 * @returns Reference to file
-			 * @throws file_not_found_error if file is not found in this archive
-			 */
-			[[nodiscard]] SArchiveFile &get_file_by_path(const std::string& path);
+		/**
+		 * <summary>
+		 * Add a file to this archive.
+		 * </summary>
+		 *
+		 * @param file File to add to this archive
+		 * @param path Path of this file
+		 * @throws file_already_exists_error if file with path already exists in this archive
+		 */
+		virtual void add_file(SArchiveFile file, const std::string &path) = 0;
 
-			/**
-			 * <summary>
-			 * Retrive a file by its path (read-only).
-			 * </summary>
-			 *
-			 * @param path Path of file to find
-			 * @returns <c>const</c> reference to file
-			 * @throws file_not_found_error if file is not found in this archive
-			 */
-			[[nodiscard]] const SArchiveFile &get_file_by_path(const std::string& path) const;
+		/**
+		 * <summary>
+		 * Move a file in this archive to a new path.
+		 * </summary>
+		 *
+		 * @param old_path Path of file
+		 * @param new_path New path to move to
+		 * @throws file_already_exists_error if file with path already exists in this archive
+		 * @throws file_not_found_error if file is not found in this archive
+		 */
+		virtual void move_file(const std::string &old_path, const std::string &new_path) = 0;
 
-			/**
-			 * <summary>
-			 * Get the path of every file in this archive.
-			 * </summary>
-			 *
-			 * @returns Vector containing all file paths
-			 */
-			[[nodiscard]] std::vector<std::string> get_all_paths() const;
+		/**
+		 * <summary>
+		 * Create a new, blank file in this archive.
+		 * </summary>
+		 *
+		 * @param path Path of this file
+		 * @returns Reference to new file
+		 * @throws file_already_exists_error if file with path already exists in this archive
+		 */
+		[[nodiscard]] virtual SArchiveFile &create_file(const std::string &path) = 0;
 
-			/**
-			 * <summary>
-			 * Add a file to this archive.
-			 * </summary>
-			 *
-			 * @param file File to add to this archive
-			 * @param path Path of this file
-			 * @throws file_already_exists_error if file with path already exists in this archive
-			 */
-			void add_file(SArchiveFile file, const std::string &path);
-
-			/**
-			 * <summary>
-			 * Move a file in this archive to a new path.
-			 * </summary>
-			 *
-			 * @param old_path Path of file
-			 * @param new_path New path to move to
-			 * @throws file_already_exists_error if file with path already exists in this archive
-			 * @throws file_not_found_error if file is not found in this archive
-			 */
-			void move_file(const std::string &old_path, const std::string &new_path);
-
-			/**
-			 * <summary>
-			 * Create a new, blank file in this archive.
-			 * </summary>
-			 *
-			 * @param path Path of this file
-			 * @returns Reference to new file
-			 * @throws file_already_exists_error if file with path already exists in this archive
-			 */
-			[[nodiscard]] SArchiveFile &create_file(const std::string &path);
-
-			/**
-			 * <summary>
-			 * Delete a file from this archive.
-			 * </summary>
-			 *
-			 * @param path Path of file to delete
-			 * @throws file_not_found_error if file is not found in this archive
-			 */
-			void delete_file(const std::string &path);
-
-			/**
-			 * <summary>
-			 * Check if this archive is being streamed.
-			 * </summary>
-			 *
-			 * @return <c>true</c> if this archive is a <c>SArchiveStream</c>, otherwise <c>false</c>
-			 */
-			bool is_stream() {return false;}
-		private:
-			std::unordered_map<std::string, SArchiveFile> m_files;
-			void load_from_serialised(const bytes_t &serialised);
+		/**
+		 * <summary>
+		 * Delete a file from this archive.
+		 * </summary>
+		 *
+		 * @param path Path of file to delete
+		 * @throws file_not_found_error if file is not found in this archive
+		 */
+		virtual void delete_file(const std::string &path) = 0;
 	};
-}
+
+	class SArchiveMemory : public SArchive {
+	public:
+		SArchiveMemory() = default;
+		explicit SArchiveMemory(const bytes_t &serialised);
+		explicit SArchiveMemory(const std::filesystem::path &path);
+		explicit SArchiveMemory(std::istream &stream, std::size_t size);
+
+		[[nodiscard]] bytes_t serialise(uint8_t compression_level, CompressStats *compression_stats) const override;
+	private:
+		std::unordered_map<std::string, SArchiveFile> m_files;
+		void load_from_serialised(const bytes_t &serialised);
+	};
+} // namespace SArc

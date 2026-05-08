@@ -31,9 +31,9 @@ The format of SArc v1 goes as follows:
 
 ## Creating & Unpacking Archives
 
-`SArc` and `UnSArc` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
+`SArc`, `UnSArc` and `SArcCeVe` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
 
-These are simple packer and unpacker command-line executables.
+These are simple packer, unpacker and signiture verification command-line executables.
 
 ```bash
 # Packs the current directory into 'out.sarc'
@@ -45,6 +45,12 @@ UnSArc  <input archive>  <output folder>
 
 # Provide a compression level
 SArc -c <compression level>
+
+# Sign the archive using a PGP key
+SArc --pgp-sign <private key>.asc
+
+# Verify the signiture
+SArcCeVe <input archive> <public key>.asc
 ```
 
 > [!TIP]
@@ -67,6 +73,10 @@ Extensions are a way to increase the functionality of SArc. They are provided as
 ### Streaming
 
 Allows streaming of archives from the disk or the network. Streaming large archives can help reduce memory usage.
+
+> [!NOTE]
+> Writing signed archives is not possible using streamed archives.
+> Use `Helpers::sign_existing_archive(SArchive &archive)` on a regular archive to achieve this.
 
 ```cpp
 // C++ Demo for SArc streaming extension
