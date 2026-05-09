@@ -2,6 +2,7 @@
 .idea/
 
 build/
+test-keys/
 
 *.sarc
 *.exe
