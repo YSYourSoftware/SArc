@@ -14,7 +14,8 @@ namespace SArc::helpers {
 	template <typename T> void set_multibyte(bytes_t &bytes, T value, const size_t offset) {
 		static_assert(std::is_integral_v<T>, "T must be an integral type");
 
-		for (size_t i = 0; i < sizeof(T); ++i) bytes.at(offset + i) = static_cast<std::byte>((value >> ((sizeof(T) - 1 - i) * 8)) & 0xFF);
+		for (size_t i = 0; i < sizeof(T); ++i)
+			bytes.at(offset + i) = static_cast<std::byte>((value >> ((sizeof(T) - 1 - i) * 8)) & 0xFF);
 	}
 
 	template <typename T> T retrieve_multibyte(const bytes_t &bytes, const size_t offset) {
@@ -29,20 +30,44 @@ namespace SArc::helpers {
 		return static_cast<T>(value);
 	}
 
+	template <typename T> std::vector<uint8_t> to_big_endian(T value) {
+		static_assert(std::is_integral_v<T>, "T must be an integral type");
+
+		using UnsignedT = std::make_unsigned_t<T>;
+		auto uvalue = static_cast<UnsignedT>(value);
+
+		std::vector<uint8_t> bytes(sizeof(T));
+
+		for (size_t i = 0; i < sizeof(T); ++i) {
+			bytes[sizeof(T) - 1 - i] = static_cast<uint8_t>(uvalue & 0xFF);
+			uvalue >>= 8;
+		}
+
+		return bytes;
+	}
+
 	bytes_t read_file(const std::filesystem::path &path);
 
 	size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
 	bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
 	bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
 
-	inline size_t lzma_get_compressed_size(const bytes_t &data, const uint8_t level = 5) {return lzma_get_compressed_size(std::span(data), level);}
-	inline bytes_t lzma_compress(const bytes_t &data, const uint8_t level = 5) {return lzma_compress(std::span(data), level);}
-	inline bytes_t lzma_decompress(const bytes_t &data, const size_t decompressed_size) {return lzma_decompress(std::span(data), decompressed_size);}
+	inline size_t lzma_get_compressed_size(const bytes_t &data, const uint8_t level = 5) {
+		return lzma_get_compressed_size(std::span(data), level);
+	}
+	inline bytes_t lzma_compress(const bytes_t &data, const uint8_t level = 5) {
+		return lzma_compress(std::span(data), level);
+	}
+	inline bytes_t lzma_decompress(const bytes_t &data, const size_t decompressed_size) {
+		return lzma_decompress(std::span(data), decompressed_size);
+	}
 
 	void emplace_null_terminated_utf8(bytes_t &bytes, const std::string &string);
 	std::string retrieve_null_terminated_utf8(const byte_span_const_t &bytes, size_t offset);
 
-	inline std::string retrieve_null_terminated_utf8(const bytes_t &bytes, const size_t offset) {return retrieve_null_terminated_utf8(std::span(bytes), offset);}
+	inline std::string retrieve_null_terminated_utf8(const bytes_t &bytes, const size_t offset) {
+		return retrieve_null_terminated_utf8(std::span(bytes), offset);
+	}
 
 	uint32_t calculate_crc32(const bytes_t &data);
-}
+} // namespace SArc::helpers

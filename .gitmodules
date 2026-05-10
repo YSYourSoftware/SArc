@@ -10,3 +10,6 @@
 [submodule "lib/rnp"]
 	path = lib/rnp
 	url = https://github.com/rnpgp/rnp.git
+[submodule "lib/winliblzma"]
+	path = lib/winliblzma
+	url = https://github.com/winlibs/liblzma.git

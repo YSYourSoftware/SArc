@@ -1,5 +1,4 @@
 #include "SArc.hpp"
-
 #include "SArc/TermColour.hpp"
 
 #include <CLI/CLI.hpp>
@@ -23,6 +22,12 @@ int main(const int argc, char *argv[]) {
 	bool follow_symlinks = false;
 	app.add_flag("--symlinks", follow_symlinks, "Follow symlinks")->default_str("false");
 
+	std::filesystem::path pgp_sign_key;
+	app.add_option("--pgp-sign", pgp_sign_key, "PGP signing key")->check(CLI::ExistingFile);
+
+	std::string pgp_sign_fp;
+	app.add_option("--pgp-sign-fp", pgp_sign_fp, "PGP signing key fingerprint");
+
 	CLI11_PARSE(app, argc, argv);
 
 	std::filesystem::directory_options dir_options{};
@@ -30,7 +35,7 @@ int main(const int argc, char *argv[]) {
 	if (follow_symlinks) dir_options |= std::filesystem::directory_options::follow_directory_symlink;
 
 	try {
-		SArchive archive;
+		SArchiveMemory archive;
 
 		size_t file_count = 0;
 		for (const auto &entry : std::filesystem::recursive_directory_iterator(in_folder, dir_options)) if (entry.is_regular_file()) file_count++;

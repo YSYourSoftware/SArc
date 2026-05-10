@@ -3,6 +3,7 @@
 
 build/
 test-keys/
+vcpkg_installed/
 
 *.sarc
 *.exe

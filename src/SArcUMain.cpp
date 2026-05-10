@@ -1,5 +1,4 @@
 #include "SArc.hpp"
-
 #include "SArc/TermColour.hpp"
 
 #include <CLI/CLI.hpp>
@@ -20,7 +19,7 @@ int main(const int argc, char *argv[]) {
 	CLI11_PARSE(app, argc, argv);
 
 	try {
-		SArchive archive(in_file);
+		SArchiveMemory archive(in_file);
 
 		size_t file_count = 0;
 		for (const auto &filepath : archive.get_all_paths()) file_count++;

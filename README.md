@@ -14,13 +14,16 @@ For native support in multiple languages, see other branches. The `main` brain w
 ## Format
 
 > [!NOTE]
-> SArc is a **Big Endian** format, that is to say all multibyte integer and float values are stored in the big-endian byte order.
+> SArc is a **big-endian** format, that is to say all multibyte integer and float values are stored in the big-endian byte order.
 
-The format of SArc v1 goes as follows: 
+The format of SArc v2 goes as follows: 
 
 - Magic value - `0x53417263` (SArc)
-- Version - `0x01`
+- Version - `0x02`
 - File count - `UInt32`
+- PGP signed flag - `UInt8`
+- PGP signature data size - `UInt16`
+- PGP signature data
 - CRC32 checksum of decompressed data - `UInt32`
 - Size of decompressed data - `UInt64`
 - *All data from here onwards is compressed*
@@ -29,9 +32,9 @@ The format of SArc v1 goes as follows:
 - - Data length - `UInt32`
 - - Data
 
-## Creating & Unpacking Archives
+## Creating, Unpacking & Verifying Archives
 
-`SArc`, `UnSArc` and `SArcCeVe` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
+`SArc`, `UnSArc` and `SArcSiVe` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
 
 These are simple packer, unpacker and signiture verification command-line executables.
 
@@ -47,10 +50,10 @@ UnSArc  <input archive>  <output folder>
 SArc -c <compression level>
 
 # Sign the archive using a PGP key
-SArc --pgp-sign <private key>.asc
+SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint>
 
-# Verify the signiture
-SArcCeVe <input archive> <public key>.asc
+# Verify a signiture
+SArcSiVe <input archive> <public key>
 ```
 
 > [!TIP]
@@ -75,8 +78,8 @@ Extensions are a way to increase the functionality of SArc. They are provided as
 Allows streaming of archives from the disk or the network. Streaming large archives can help reduce memory usage.
 
 > [!NOTE]
-> Writing signed archives is not possible using streamed archives.
-> Use `Helpers::sign_existing_archive(SArchive &archive)` on a regular archive to achieve this.
+> Signing archives is not possible using streamed archives.
+> Use `memory_archive.sign(/* TODO: Add API */);` on a memory-loaded archive to achieve this.
 
 ```cpp
 // C++ Demo for SArc streaming extension
@@ -84,9 +87,13 @@ Allows streaming of archives from the disk or the network. Streaming large archi
 
 using namespace SArc;
 
-SArchiveStream stream("archive.sarc"); // Stream an archive from a file
-SArchiveFile &my_file = stream.get_file_by_path("hello_world.txt");
+SArchiveStream streamed_archive("archive.sarc"); // Stream an archive from a file
+SArchiveFile &my_file = streamed_archive.get_file_by_path("hello_world.txt");
 
 void archive_magic(SArchive &archive);
-archive_magic(stream); // SArchiveStream inherits SArchive
+archive_magic(streamed_archive); // SArchiveStream inherits SArchive
+
+// Certain actions require an archive loaded in memory, like signing
+SArchiveMemory memory_archive = streamed_archive.load_into_memory(); // Load the archive into memory
+memory_archive.sign(/* TODO: Add API */);
 ```

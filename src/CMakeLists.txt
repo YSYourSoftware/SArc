@@ -1,4 +1,4 @@
-target_sources(SArc PUBLIC
+target_sources(SArc PRIVATE
 	Helpers.cpp
 	SArchive.cpp
 	SArchiveFile.cpp

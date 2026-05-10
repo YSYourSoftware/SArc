@@ -7,9 +7,13 @@ namespace SArc {
 
 	class SArchiveStream : public SArchive {
 		public:
-			SArchiveStream(std::istream &stream, std::streamsize size);
+			explicit SArchiveStream(std::istream &stream, std::streamsize size);
+
+			[[nodiscard]] SArchiveMemory load_into_memory();
 		private:
 			std::istream &m_stream;
 			size_t m_size;
 	};
+
+
 }

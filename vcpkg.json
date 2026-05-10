@@ -1,0 +1,25 @@
+{
+  "name": "ys-sarc",
+  "version-string": "2.0.0",
+  "license": "WTFPL",
+  "dependencies": [
+    "bzip2",
+    "dirent",
+    "getopt",
+    {
+      "name": "gmp",
+      "platform": "!windows"
+    },
+    "json-c",
+    {
+      "name": "liblzma",
+      "platform": "!windows"
+    },
+    {
+      "name": "mpir",
+      "platform": "windows"
+    },
+    "zlib",
+    "botan"
+  ]
+}

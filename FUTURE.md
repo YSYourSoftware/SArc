@@ -8,7 +8,7 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 ### Version 2
 
 - [ ] Add support for 64-bit archives (files larger than ~4GB)
-- [ ] PGP signing of archives using [gpgme++](https://github.com/gpg/gpgmepp)
+- [X] PGP signing of archives 
 - [ ] AES256 and PGP encryption of archives
 
 ## Library Features

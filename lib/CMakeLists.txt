@@ -3,21 +3,33 @@ if(SARC_BUILD_EXEC)
 	add_subdirectory(CLI11)
 
 	target_link_libraries(SArcC PRIVATE CLI11::CLI11)
-	target_include_directories(SArcC PUBLIC CLI11/include)
+	target_include_directories(SArcC PRIVATE CLI11/include)
 	
 	target_link_libraries(SArcU PRIVATE CLI11::CLI11)
-	target_include_directories(SArcU PUBLIC CLI11/include)
+	target_include_directories(SArcU PRIVATE CLI11/include)
+
+	target_link_libraries(SArcSiVe PRIVATE CLI11::CLI11)
+	target_include_directories(SArcSiVe PRIVATE CLI11/include)
 endif()
 
-target_include_directories(SArc PUBLIC utfcpp/source)
+set(CRYPTO_BACKEND "botan")
+add_subdirectory(rnp)
 
-target_sources(SArc PUBLIC
+target_link_libraries(SArc PRIVATE librnp)
+
+if(WIN32)
+	add_subdirectory(winliblzma)
+	target_link_libraries(SArc PRIVATE liblzma)
+endif()
+
+target_sources(SArc PRIVATE
 	ccrc/arccrc16.c
 	ccrc/checkexe.c
 	ccrc/checksum.c
 	ccrc/crc_16.c
 	ccrc/crc_16f.c
 	ccrc/crc_32.c
+
 	lzma/Alloc.c
 	lzma/CpuArch.c
 	lzma/LzFind.c
@@ -29,7 +41,8 @@ target_sources(SArc PUBLIC
 	lzma/Threads.c
 )
 
-target_include_directories(SArc PUBLIC
+target_include_directories(SArc PRIVATE
 	ccrc
 	lzma
+	utfcpp/source
 )

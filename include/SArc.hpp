@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <span>
 #include <string>
@@ -18,6 +19,9 @@
 		if (!(condition)) throw error_type(message);                                                                   \
 	} while (0)
 
+typedef struct rnp_ffi_st *rnp_ffi_t;
+typedef struct rnp_key_handle_st *rnp_key_handle_t;
+
 namespace SArc {
 	constexpr uint32_t SARC_MAGIC = 0x53417263; // "SArc" in ASCII
 	constexpr std::byte SARC_VERSION{0x01};
@@ -26,6 +30,8 @@ namespace SArc {
 	typedef std::vector<std::byte> bytes_t;
 	typedef std::span<std::byte> byte_span_t;
 	typedef std::span<const std::byte> byte_span_const_t;
+
+	typedef std::array<uint8_t, 20> pgp_fingerprint_t;
 
 	SARC_ADD_RUNTIME_ERROR(file_not_found_error);
 	SARC_ADD_RUNTIME_ERROR(file_already_exists_error);
@@ -36,6 +42,11 @@ namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(corrupted_data);
 	SARC_ADD_RUNTIME_ERROR(malformed_headers);
 	SARC_ADD_RUNTIME_ERROR(version_mismatch);
+
+	SARC_ADD_RUNTIME_ERROR(invalid_signature);
+	SARC_ADD_RUNTIME_ERROR(invalid_gpg_data);
+	SARC_ADD_RUNTIME_ERROR(ffi_error);
+	SARC_ADD_RUNTIME_ERROR(sign_error);
 
 	struct CompressStats {
 		size_t decompressed_size;
@@ -137,7 +148,7 @@ namespace SArc {
 		 * @param compression_stats (Optional) <c>CompressStats</c> struct to fill out
 		 */
 		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream,
-								 CompressStats *compression_stats) const = 0;
+										 CompressStats *compression_stats) const = 0;
 
 		/**
 		 * <summary>
@@ -149,17 +160,6 @@ namespace SArc {
 		 * @throws file_not_found_error if file is not found in this archive
 		 */
 		[[nodiscard]] virtual SArchiveFile &get_file_by_path(const std::string &path) = 0;
-
-		/**
-		 * <summary>
-		 * Retrive a file by its path (read-only).
-		 * </summary>
-		 *
-		 * @param path Path of file to find
-		 * @returns <c>const</c> reference to file
-		 * @throws file_not_found_error if file is not found in this archive
-		 */
-		[[nodiscard]] virtual SArchiveFile &get_file_by_path(const std::string &path) const = 0;
 
 		/**
 		 * <summary>
@@ -222,9 +222,43 @@ namespace SArc {
 		explicit SArchiveMemory(const std::filesystem::path &path);
 		explicit SArchiveMemory(std::istream &stream, std::size_t size);
 
+		~SArchiveMemory();
+
 		[[nodiscard]] bytes_t serialise(uint8_t compression_level, CompressStats *compression_stats) const override;
+
+		void serialise_to_stream(uint8_t compression_level, std::ostream &stream,
+								 CompressStats *compression_stats) const override;
+
+		[[nodiscard]] SArchiveFile &get_file_by_path(const std::string &path) override;
+		[[nodiscard]] std::vector<std::string> get_all_paths() const override;
+
+		void add_file(SArchiveFile file, const std::string &path) override;
+		void move_file(const std::string &old_path, const std::string &new_path) override;
+
+		[[nodiscard]] SArchiveFile &create_file(const std::string &path) override;
+		void delete_file(const std::string &path) override;
+
+		/**
+		 * <summary>
+		 * Sign the archive using a GPG format secret key.
+		 * </summary>
+		 *
+		 * @param key Secret key data
+		 * @param key_passphrase Secret key passphrase
+		 * @throws invalid_gpg_data if the key failed to load
+		 * @throws ffi_error if initialising or using the FFI object fails
+		 * @param key_fingerprint Fingerprint of secret key
+		 */
+		void sign(const byte_span_const_t &key, const std::string &key_passphrase, const pgp_fingerprint_t &key_fingerprint);
 	private:
-		std::unordered_map<std::string, SArchiveFile> m_files;
 		void load_from_serialised(const bytes_t &serialised);
+
+		[[nodiscard]] bytes_t sign_data(const byte_span_const_t &data) const;
+
+		std::unordered_map<std::string, SArchiveFile> m_files;
+
+		rnp_ffi_t m_ffi = nullptr;
+		rnp_key_handle_t m_signing_key = nullptr;
+		std::string m_signing_key_passphrase;
 	};
 } // namespace SArc

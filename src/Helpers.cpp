@@ -1,7 +1,7 @@
 #include "SArc/Helpers.hpp"
 
-#include <crc.h>
 #include <LzmaLib.h>
+#include <crc.h>
 #include <utf8.h>
 
 #include <fstream>
