@@ -11,6 +11,7 @@ SArchiveMemory::SArchiveMemory(const bytes_t &serialised) { this->load_from_seri
 SArchiveMemory::SArchiveMemory(const std::filesystem::path &path) {
 	this->load_from_serialised(helpers::read_file(path));
 }
+
 SArchiveMemory::SArchiveMemory(std::istream &stream, const std::size_t size) {
 	bytes_t data(size);
 	SARC_RUNTIME_ASSERT(stream.read(reinterpret_cast<char *>(data.data()), size), io_error,
@@ -18,94 +19,29 @@ SArchiveMemory::SArchiveMemory(std::istream &stream, const std::size_t size) {
 	this->load_from_serialised(data);
 }
 
-bytes_t SArchiveMemory::serialise(const uint8_t compression_level, CompressStats *compression_stats) const {
-	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
-						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
-
-	const bool sign_archive = m_signing_key != nullptr;
-
-	size_t uncompressed_size_alloc = 0;
-	for (const auto &[filename, file] : this->m_files) {
-		uncompressed_size_alloc += filename.size()	   // Filename UTF-8         [std::string]
-								   + 1				   // String null-terminator [std::byte]
-								   + 4				   // Data length            [uint32_t]
-								   + file.data.size(); // Data                   [bytes_t]
-	}
-
-	bytes_t to_compress;
-	to_compress.reserve(uncompressed_size_alloc);
-
-	for (const auto &[filename, file] : this->m_files) {
-		helpers::emplace_null_terminated_utf8(to_compress, filename);
-		file.serialise_append(to_compress);
-	}
-
-	to_compress.shrink_to_fit();
-
-	bytes_t compressed = helpers::lzma_compress(to_compress, compression_level);
-
-	if (compression_stats) compression_stats->decompressed_size = to_compress.size();
-	if (compression_stats) compression_stats->compressed_size = compressed.size();
-
-	bytes_t sign_data;
-
-	if (sign_archive) sign_data = this->sign_data(compressed);
-
+bytes_t SArchiveMemory::serialise(const uint8_t compression_level) const {
 	bytes_t serialised;
-	serialised.reserve(4										// SArc magic        [uint32_t]
-					   + 1										// SArc version      [uint8_t]
-					   + 4										// File count        [uint32_t]
-					   + 1										// Is signed?        [bool]
-					   + (sign_archive ? 2						// Signing data size [uint16_t]
-											 + sign_data.size() // Signing data      [bytes_t]
-									   : 0) +
-					   4				   // CRC32 checksum    [uint32_t]
-					   + 8				   // Decompressed size [uint64_t]
-					   + compressed.size() // Compressed data   [bytes_t]
-	);
+	helpers::BytesOStream out{serialised};
 
-	helpers::emplace_multibyte<uint32_t>(serialised, SARC_MAGIC);
-	serialised.emplace_back(SARC_VERSION);
-	helpers::emplace_multibyte<uint32_t>(serialised, this->m_files.size());
-
-	serialised.emplace_back(static_cast<std::byte>(sign_archive ? 0x00 : 0x01));
-	if (sign_archive)
-		serialised.insert(serialised.end(), std::make_move_iterator(sign_data.begin()),
-						  std::make_move_iterator(sign_data.end()));
-
-	helpers::emplace_multibyte<uint32_t>(serialised, helpers::calculate_crc32(to_compress));
-
-	helpers::emplace_multibyte<uint64_t>(serialised, to_compress.size());
-	serialised.insert(serialised.end(), std::make_move_iterator(compressed.begin()),
-					  std::make_move_iterator(compressed.end()));
+	serialise_to_stream(compression_level, out);
 
 	serialised.shrink_to_fit();
-
 	return serialised;
 }
 
-void SArchiveMemory::serialise_to_stream(uint8_t compression_level, std::ostream &stream,
-										 CompressStats *compression_stats) const {
-	uint8_t var_u8;
+void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::ostream &stream) const {
+	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
+						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
 
-	const bool sign_archive = m_signing_key != nullptr;
-
-	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(SARC_MAGIC).data()), sizeof(SARC_MAGIC));
-	stream.write(reinterpret_cast<const char *>(&SARC_VERSION), 1);
-
-	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(this->m_files.size()).data()), 4);
-
-	var_u8 = sign_archive ? 0x01 : 0x00;
-	stream.write(reinterpret_cast<const char *>(&var_u8), 1);
-
-	if (sign_archive) {
-
-	}
-
-	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(0).data()), 4);
+	// TODO: this function was getting messy, so I removed the body.
 }
 
 SArchiveFile &SArchiveMemory::get_file_by_path(const std::string &path) {
+	SARC_RUNTIME_ASSERT(this->m_files.contains(path), file_not_found_error, "No file at " + path + " in archive");
+	return this->m_files.find(path)->second;
+}
+
+const SArchiveFile &SArchiveMemory::get_file_by_path_const(const std::string &path) const {
 	SARC_RUNTIME_ASSERT(this->m_files.contains(path), file_not_found_error, "No file at " + path + " in archive");
 	return this->m_files.find(path)->second;
 }
@@ -151,7 +87,7 @@ void SArchiveMemory::delete_file(const std::string &path) {
 }
 
 void SArchiveMemory::load_from_serialised(const bytes_t &serialised) {
-	size_t offset = 0;
+	/*size_t offset = 0;
 
 	SARC_RUNTIME_ASSERT(helpers::retrieve_multibyte<uint32_t>(serialised, offset) == SARC_MAGIC, malformed_headers,
 						"SArc magic missing");
@@ -179,5 +115,5 @@ void SArchiveMemory::load_from_serialised(const bytes_t &serialised) {
 
 		this->add_file(SArchiveFile{decompressed, file_size, offset}, file_path);
 		offset += file_size;
-	}
+	}*/
 }

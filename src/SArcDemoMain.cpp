@@ -11,7 +11,7 @@ int main() {
 	{
 		const auto data = "test data blah blah blah blah 1234567890 what a wonderful day it is on the 9th may 2026 when sam sits inside writing this code...";
 		SArchiveFile &file = archive.create_file("test.txt");
-		file.data.reserve(std::strlen(data));
+		file.data.resize(std::strlen(data));
 		std::memcpy(file.data.data(), data, std::strlen(data));
 	}
 
@@ -20,9 +20,9 @@ int main() {
 	archive.sign(std::span(secret_key), "password", {0x40, 0x3B, 0xE7, 0x73, 0x73, 0x48, 0xB7, 0x60, 0x01, 0xEC,
 													 0xCF, 0xCC, 0x3D, 0x5F, 0x1B, 0x95, 0xEC, 0xB4, 0xBE, 0x90});
 
-	const bytes_t data = archive.serialise(1, nullptr);
+
 	std::ofstream out("test.sarc");
-	out.write(reinterpret_cast<const char*>(data.data()), data.size());
+	out << archive;
 
 	return 0;
 }

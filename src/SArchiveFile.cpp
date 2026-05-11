@@ -18,8 +18,12 @@ SArchiveFile::SArchiveFile(std::istream &stream, const std::size_t size) {
 }
 
 void SArchiveFile::serialise_append(bytes_t &bytes) const {
-	if (this->data.size() > UINT32_MAX) throw std::overflow_error("Size of data vector larger than UINT32_MAX");
+	SARC_RUNTIME_ASSERT(this->data.size() < UINT32_MAX, std::overflow_error, "Size of data vector larger than UINT32_MAX");
 
 	helpers::emplace_multibyte<uint32_t>(bytes, this->data.size());
 	bytes.insert(bytes.end(), this->data.begin(), this->data.end());
+}
+
+uint32_t SArchiveFile::get_serialised_size() const {
+	return sizeof(uint32_t) + this->data.size();
 }

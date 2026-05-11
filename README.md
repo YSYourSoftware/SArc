@@ -7,10 +7,6 @@ It currently officially supports 1 compression format:
 > [!NOTE]
 > All other compression schemes were dropped in v1.
 
-## NEW: Multi-language support
-
-For native support in multiple languages, see other branches. The `main` brain will still remain the C/C++ branch. 
-
 ## Format
 
 > [!NOTE]
@@ -18,19 +14,26 @@ For native support in multiple languages, see other branches. The `main` brain w
 
 The format of SArc v2 goes as follows: 
 
-- Magic value - `0x53417263` (SArc)
-- Version - `0x02`
-- File count - `UInt32`
-- PGP signed flag - `UInt8`
-- PGP signature data size - `UInt16`
-- PGP signature data
-- CRC32 checksum of decompressed data - `UInt32`
-- Size of decompressed data - `UInt64`
-- *All data from here onwards is compressed*
-- *Per file:*
-- - File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
-- - Data length - `UInt32`
-- - Data
+```text
+Magic value                 0x53417263 (SArc)
+Version                     0x02
+Block count                 UInt32
+PGP signed flag             UInt8
+If PGP:
+  PGP signature size        UInt16
+  PGP signature data
+Per block:
+  File count                UInt8
+  Per file:
+    File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
+                (note that the order of paths denotes the order files are stored in)
+  Decompressed block size   UInt32
+  Compressed block size     UInt32
+  Compressed:
+   Per file:
+     Data length            UInt32
+     Data
+```
 
 ## Creating, Unpacking & Verifying Archives
 
@@ -51,13 +54,13 @@ SArc -c <compression level>
 
 # Sign the archive using a PGP key
 SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint>
+SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint> --pgp-sign-ps <key passphrase>
 
 # Verify a signiture
 SArcSiVe <input archive> <public key>
 ```
 
-> [!TIP]
-> SArc has a 7-Zip plugin, called [7-SArc](https://github.com/YSYourSoftware/7-SArc).
+For more information, use `--help`.
 
 ## Repacking & Updating Archives
 
@@ -66,8 +69,6 @@ To combat this, you will need to unpack an archive using the `UnSArc` executable
 
 > [!TIP]
 > You can also do this to switch compression schemes.
-
-There is also a [web tool](https://YourSoftware.org/projects/SArc/archive-updater) which supports every version of SArc (excluding v0).
 
 ## Extensions
 

@@ -7,9 +7,13 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 
 ### Version 2
 
-- [ ] Add support for 64-bit archives (files larger than ~4GB)
-- [X] PGP signing of archives 
+- [X] PGP signing of archives
+- [ ] [Block architecture](plans/blocks.txt) rather than one blob
+
+### Version 3
+
 - [ ] AES256 and PGP encryption of archives
+- [ ] 64-bit size fields
 
 ## Library Features
 
@@ -19,3 +23,4 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 ## Extra features
 
 - [ ] SArc debugger / fixer tool
+- [ ] 7-Zip plugin

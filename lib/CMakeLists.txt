@@ -4,7 +4,7 @@ if(SARC_BUILD_EXEC)
 
 	target_link_libraries(SArcC PRIVATE CLI11::CLI11)
 	target_include_directories(SArcC PRIVATE CLI11/include)
-	
+
 	target_link_libraries(SArcU PRIVATE CLI11::CLI11)
 	target_include_directories(SArcU PRIVATE CLI11/include)
 
@@ -16,11 +16,6 @@ set(CRYPTO_BACKEND "botan")
 add_subdirectory(rnp)
 
 target_link_libraries(SArc PRIVATE librnp)
-
-if(WIN32)
-	add_subdirectory(winliblzma)
-	target_link_libraries(SArc PRIVATE liblzma)
-endif()
 
 target_sources(SArc PRIVATE
 	ccrc/arccrc16.c
@@ -44,5 +39,4 @@ target_sources(SArc PRIVATE
 target_include_directories(SArc PRIVATE
 	ccrc
 	lzma
-	utfcpp/source
 )

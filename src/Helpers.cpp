@@ -2,7 +2,6 @@
 
 #include <LzmaLib.h>
 #include <crc.h>
-#include <utf8.h>
 
 #include <fstream>
 #include <iostream>
@@ -124,8 +123,6 @@ bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t dec
 }
 
 void helpers::emplace_null_terminated_utf8(bytes_t &bytes, const std::string &string) {
-	if (!utf8::is_valid(string)) throw std::invalid_argument("Invalid UTF-8 string");
-
 	for (const char c : string) bytes.push_back(static_cast<std::byte>(c));
 	bytes.push_back(static_cast<std::byte>(0));
 }
@@ -141,8 +138,6 @@ std::string helpers::retrieve_null_terminated_utf8(const byte_span_const_t &byte
 		if (c == 0) break;
 		result.push_back(static_cast<char>(c));
 	}
-
-	if (!utf8::is_valid(result.begin(), result.end())) throw std::runtime_error("Buffer contained invalid UTF-8");
 
 	return result;
 }

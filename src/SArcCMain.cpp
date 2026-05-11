@@ -25,8 +25,11 @@ int main(const int argc, char *argv[]) {
 	std::filesystem::path pgp_sign_key;
 	app.add_option("--pgp-sign", pgp_sign_key, "PGP signing key")->check(CLI::ExistingFile);
 
-	std::string pgp_sign_fp;
-	app.add_option("--pgp-sign-fp", pgp_sign_fp, "PGP signing key fingerprint");
+	std::string pgp_sign_fingerprint{};
+	app.add_option("--pgp-sign-fp", pgp_sign_fingerprint, "PGP signing key fingerprint");
+
+	std::string pgp_sign_passphrase{};
+	app.add_option("--pgp-sign-ps", pgp_sign_passphrase, "PGP signing key passphrase");
 
 	CLI11_PARSE(app, argc, argv);
 
@@ -37,30 +40,53 @@ int main(const int argc, char *argv[]) {
 	try {
 		SArchiveMemory archive;
 
-		size_t file_count = 0;
-		for (const auto &entry : std::filesystem::recursive_directory_iterator(in_folder, dir_options)) if (entry.is_regular_file()) file_count++;
+		if (!pgp_sign_fingerprint.empty()) {
+			SARC_RUNTIME_ASSERT(pgp_sign_fingerprint.length() != 40, std::invalid_argument,
+								"PGP fingerprint must be 40 characters long (20 hex bytes).");
 
-		if (file_count > UINT32_MAX) throw std::runtime_error("File count above UINT32_MAX");
+			std::ifstream key_file{pgp_sign_key, std::ios::binary};
+
+			key_file.seekg(0, std::ios::end);
+			const uint32_t key_size = key_file.tellg();
+			key_file.seekg(0, std::ios::beg);
+
+			bytes_t key_data{key_size};
+			key_file.read(reinterpret_cast<char *>(key_data.data()), key_size);
+
+			pgp_fingerprint_t fingerprint{};
+			for (size_t i = 0; i < 20; ++i) {
+				std::string byte_str = pgp_sign_fingerprint.substr(i * 2, 2);
+				fingerprint[i] = static_cast<uint8_t>(std::stoi(byte_str, nullptr, 16));
+			}
+
+			archive.sign(key_data, pgp_sign_passphrase, fingerprint);
+
+			std::cout << STC_GREEN << "Loaded PGP signing key." << STC_RESET << std::endl;
+		}
+
+		size_t file_count = 0;
+		for (const auto &entry : std::filesystem::recursive_directory_iterator(in_folder, dir_options))
+			if (entry.is_regular_file()) file_count++;
+
+		if (file_count > UINT32_MAX) throw std::runtime_error("File count above UINT32_MAX.");
 
 		uint32_t i = 0;
 		for (const auto &entry : std::filesystem::recursive_directory_iterator(in_folder, dir_options)) {
 			if (!entry.is_regular_file()) continue;
 			std::string entry_path = std::filesystem::relative(entry.path(), in_folder).generic_string();
 			std::ranges::replace(entry_path, '\\', '/');
+
 			std::cout << std::format("[" STC_BLUE "{}/{}" STC_RESET "] ", ++i, file_count) << entry_path << std::endl;
-			archive.add_file(SArchiveFile{entry.path()}, entry_path);
+
+			archive += SArchiveFile{entry.path()}.at(entry_path);
 		}
 
-		CompressStats compress_stats{};
-		bytes_t data = archive.serialise(compression_level, &compress_stats);
+		std::ofstream out{out_file, std::ios::binary};
+		if (!out) throw io_error("Failed to open output file.");
 
-		std::cout << STC_MAGENTA << std::format("Compression (LZMA level {}) saved {} bytes", compression_level, compress_stats.decompressed_size - compress_stats.compressed_size) << STC_RESET << std::endl;
+		out << archive;
 
-		std::ofstream out(out_file, std::ios::binary);
-		if (!out) throw io_error("Failed to open output file");
-
-		out.write(reinterpret_cast<const char*>(data.data()), data.size());
-		if (!out) throw io_error("Failed to write to output file");
+		if (!out) throw io_error("Failed to write to output file.");
 
 		std::cout << STC_GREEN << "Written archive to " << STC_BOLDGREEN << out_file << STC_RESET << std::endl;
 	} catch (std::exception &e) {

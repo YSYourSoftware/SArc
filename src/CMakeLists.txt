@@ -4,6 +4,4 @@ target_sources(SArc PRIVATE
 	SArchiveFile.cpp
 	SArchiveSigning.cpp
 	SArchiveStream.cpp
-
-	SArchive.c
 )
