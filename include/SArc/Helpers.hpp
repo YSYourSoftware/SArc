@@ -25,11 +25,7 @@ namespace SArc::helpers {
 
 	class BytesOStream : public std::ostream {
 	public:
-		explicit BytesOStream(bytes_t &buffer)
-			: std::ostream(&buf_)
-			, buf_(buffer)
-		{}
-
+		explicit BytesOStream(bytes_t &buffer) : std::ostream(&buf_), buf_(buffer) {}
 	private:
 		BytesStream buf_;
 	};
@@ -75,6 +71,9 @@ namespace SArc::helpers {
 		return bytes;
 	}
 
+	file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
+								   const file_block_map_t &file_block_map);
+
 	bytes_t read_file(const std::filesystem::path &path);
 
 	size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
@@ -85,4 +84,7 @@ namespace SArc::helpers {
 	std::string retrieve_null_terminated_utf8(const byte_span_const_t &bytes, size_t offset);
 
 	uint32_t calculate_crc32(const bytes_t &data);
+
+	void archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
+											uint8_t compression_level, std::ostream &stream);
 } // namespace SArc::helpers

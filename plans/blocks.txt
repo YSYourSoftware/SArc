@@ -15,7 +15,7 @@ at the moment we:
 which leads to great compression ratios, but uses a lot of memory and isn't very stream-friendly.
 now that the sarc streaming extension works great, it'd be better to store files in blocks.
 
-blocks should be an arbitrary max size (e.g. 500mb for high ratio, 8mb for high speed)
-if we give a block size of 0, that means each file it its own block, and UINT32_MAX means max in every block
+blocks should be an arbitrary max size (e.g. 500mb for high ratio, 8mb for low memory usage)
+if we give a block size of 0, that means each file is its own block, and UINT32_MAX means max in every block
 we should be able to pass block sizes in to the serialise function (and therefore into the cli)
 blocks won't really affect memory archives that much other than loading and serialisation but streamed archives will see great improvement.

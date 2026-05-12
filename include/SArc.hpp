@@ -33,6 +33,8 @@ namespace SArc {
 
 	typedef std::array<uint8_t, 20> pgp_fingerprint_t;
 
+	typedef std::unordered_map<std::string, uint32_t> file_block_map_t;
+
 	SARC_ADD_RUNTIME_ERROR(file_not_found_error);
 	SARC_ADD_RUNTIME_ERROR(file_already_exists_error);
 	SARC_ADD_RUNTIME_ERROR(io_error);
@@ -75,9 +77,12 @@ namespace SArc {
 		 * </summary>
 		 *
 		 * @param compression_level LZMA compression level (0-9)
+		 * @param block_target_size Target block size, in bytes
+		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
 		 * @returns Byte vector of serialised data
 		 */
-		[[nodiscard]] virtual bytes_t serialise(uint8_t compression_level) const = 0;
+		[[nodiscard]] virtual bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
+												const file_block_map_t &file_block_map) const = 0;
 
 		/**
 		 * <summary>
@@ -86,8 +91,11 @@ namespace SArc {
 		 *
 		 * @param compression_level LZMA compression level (0-9)
 		 * @param stream Output data stream to write to
+		 * @param block_target_size Target block size, in bytes
+		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
 		 */
-		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream) const = 0;
+		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
+										 const file_block_map_t &file_block_map) const = 0;
 
 		/**
 		 * <summary>
@@ -320,9 +328,11 @@ namespace SArc {
 
 		~SArchiveMemory();
 
-		[[nodiscard]] bytes_t serialise(uint8_t compression_level) const override;
+		[[nodiscard]] bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
+										const file_block_map_t &file_block_map) const override;
 
-		void serialise_to_stream(uint8_t compression_level, std::ostream &stream) const override;
+		void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
+								 const file_block_map_t &file_block_map) const override;
 
 		[[nodiscard]] SArchiveFile &get_file_by_path(const std::string &path) override;
 		[[nodiscard]] const SArchiveFile &get_file_by_path_const(const std::string &path) const override;
@@ -370,7 +380,7 @@ namespace SArc {
 	}
 
 	inline std::ostream &operator<<(std::ostream &stream, const SArchive &archive) {
-		archive.serialise_to_stream(5, stream);
+		archive.serialise_to_stream(5, stream, UINT32_MAX, {});
 		return stream;
 	}
 

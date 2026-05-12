@@ -19,21 +19,55 @@ SArchiveMemory::SArchiveMemory(std::istream &stream, const std::size_t size) {
 	this->load_from_serialised(data);
 }
 
-bytes_t SArchiveMemory::serialise(const uint8_t compression_level) const {
+bytes_t SArchiveMemory::serialise(const uint8_t compression_level, const uint32_t block_target_size,
+								  const file_block_map_t &file_block_map) const {
 	bytes_t serialised;
 	helpers::BytesOStream out{serialised};
 
-	serialise_to_stream(compression_level, out);
+	serialise_to_stream(compression_level, out, block_target_size, file_block_map);
 
 	serialised.shrink_to_fit();
 	return serialised;
 }
 
-void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::ostream &stream) const {
+void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::ostream &stream,
+										 const uint32_t block_target_size,
+										 const file_block_map_t &file_block_map) const {
 	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
 						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
 
-	// TODO: this function was getting messy, so I removed the body.
+	const bool pgp_signed = m_signing_key != nullptr;
+	const file_block_map_t final_file_block_map = helpers::auto_mappings(*this, block_target_size, file_block_map);
+
+	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(SARC_MAGIC).data()), sizeof(uint32_t));
+	stream.write(reinterpret_cast<const char *>(&SARC_VERSION), 1);
+
+	uint32_t block_count = 0;
+	for (const auto block : final_file_block_map | std::views::values)
+		if (block > block_count) block_count = block;
+
+	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_count).data()), sizeof(uint32_t));
+
+	const uint8_t temp = pgp_signed ? 0x01 : 0x00;
+	stream.write(reinterpret_cast<const char *>(&temp), 1);
+
+	if (pgp_signed) {
+		bytes_t buffer;
+		helpers::BytesOStream out{buffer};
+
+		helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, out);
+
+		const bytes_t signature = sign_data(buffer);
+
+		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint16_t>(signature.size()).data()), sizeof(uint16_t));
+		stream.write(reinterpret_cast<const char *>(signature.data()), signature.size());
+
+		stream.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
+
+		return;
+	}
+
+	helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, stream);
 }
 
 SArchiveFile &SArchiveMemory::get_file_by_path(const std::string &path) {

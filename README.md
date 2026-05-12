@@ -26,7 +26,8 @@ Per block:
   File count                UInt8
   Per file:
     File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
-                (note that the order of paths denotes the order files are stored in)
+                (the order of paths denotes the order files are stored in)
+  Decompressed block CRC32  UInt32
   Decompressed block size   UInt32
   Compressed block size     UInt32
   Compressed:
