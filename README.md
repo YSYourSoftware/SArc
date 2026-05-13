@@ -81,7 +81,7 @@ Allows streaming of archives from the disk or the network. Streaming large archi
 
 > [!NOTE]
 > Signing archives is not possible using streamed archives.
-> Use `memory_archive.sign(/* TODO: Add API */);` on a memory-loaded archive to achieve this.
+> Use `memory_archive.sign(...);` on a memory-loaded archive to achieve this.
 
 ```cpp
 // C++ Demo for SArc streaming extension
@@ -90,12 +90,12 @@ Allows streaming of archives from the disk or the network. Streaming large archi
 using namespace SArc;
 
 SArchiveStream streamed_archive("archive.sarc"); // Stream an archive from a file
-SArchiveFile &my_file = streamed_archive.get_file_by_path("hello_world.txt");
+SArchiveFile &my_file = streamed_archive["hello_world.txt"];
 
 void archive_magic(SArchive &archive);
 archive_magic(streamed_archive); // SArchiveStream inherits SArchive
 
 // Certain actions require an archive loaded in memory, like signing
 SArchiveMemory memory_archive = streamed_archive.load_into_memory(); // Load the archive into memory
-memory_archive.sign(/* TODO: Add API */);
+memory_archive.sign(key, "my_passphrase", {0x01, 0x02, ...});
 ```
