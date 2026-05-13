@@ -70,7 +70,7 @@ bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
 											  false) == RNP_SUCCESS,
 						sign_error, "Failed to create input");
 	SARC_RUNTIME_ASSERT(rnp_output_to_memory(&output, 0) == RNP_SUCCESS, sign_error, "Failed to create output");
-	SARC_RUNTIME_ASSERT(rnp_op_sign_create(&sign, m_ffi, input, output) == RNP_SUCCESS, sign_error,
+	SARC_RUNTIME_ASSERT(rnp_op_sign_detached_create(&sign, m_ffi, input, output) == RNP_SUCCESS, sign_error,
 						"Failed to create sign op");
 
 	rnp_op_sign_set_armor(sign, false);
@@ -79,7 +79,7 @@ bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
 	SARC_RUNTIME_ASSERT(rnp_op_sign_add_signature(sign, m_signing_key, nullptr) == RNP_SUCCESS, sign_error,
 						"Failed to add signature");
 	SARC_RUNTIME_ASSERT(rnp_op_sign_execute(sign) == RNP_SUCCESS, sign_error,
-						"Failed to sign"); // Exception 0xe06d7363 encountered at address 0x7ff87fc679da
+						"Failed to sign");
 	SARC_RUNTIME_ASSERT(rnp_output_memory_get_buf(output, &output_buf, &output_len, false) == RNP_SUCCESS, sign_error,
 						"Failed to get signed buffer");
 
@@ -93,3 +93,4 @@ bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
 
 	return result;
 }
+

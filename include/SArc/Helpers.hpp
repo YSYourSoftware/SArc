@@ -71,6 +71,11 @@ namespace SArc::helpers {
 		return bytes;
 	}
 
+	typedef struct pgp_sigver_result {
+		bool valid;
+		pgp_fingerprint_t fingerprint;
+	} pgp_sigver_result_t;
+
 	file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
 								   const file_block_map_t &file_block_map);
 
@@ -87,4 +92,8 @@ namespace SArc::helpers {
 
 	void archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
 											uint8_t compression_level, std::ostream &stream);
+
+	pgp_sigver_result_t verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
+													  std::istream &stream);
+	pgp_fingerprint_t hex_str_to_fingerprint(const std::string &hex);
 } // namespace SArc::helpers

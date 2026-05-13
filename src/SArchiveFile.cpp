@@ -25,5 +25,5 @@ void SArchiveFile::serialise_append(bytes_t &bytes) const {
 }
 
 uint32_t SArchiveFile::get_serialised_size() const {
-	return sizeof(uint32_t) + this->data.size();
+	return 4 + this->data.size();
 }

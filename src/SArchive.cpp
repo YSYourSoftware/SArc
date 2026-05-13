@@ -39,14 +39,14 @@ void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::o
 	const bool pgp_signed = m_signing_key != nullptr;
 	const file_block_map_t final_file_block_map = helpers::auto_mappings(*this, block_target_size, file_block_map);
 
-	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(SARC_MAGIC).data()), sizeof(uint32_t));
+	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(SARC_MAGIC).data()), 4);
 	stream.write(reinterpret_cast<const char *>(&SARC_VERSION), 1);
 
 	uint32_t block_count = 0;
 	for (const auto block : final_file_block_map | std::views::values)
-		if (block > block_count) block_count = block;
+		if (block >= block_count) block_count = block + 1;
 
-	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_count).data()), sizeof(uint32_t));
+	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_count).data()), 4);
 
 	const uint8_t temp = pgp_signed ? 0x01 : 0x00;
 	stream.write(reinterpret_cast<const char *>(&temp), 1);
@@ -59,7 +59,7 @@ void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::o
 
 		const bytes_t signature = sign_data(buffer);
 
-		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint16_t>(signature.size()).data()), sizeof(uint16_t));
+		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint16_t>(signature.size()).data()), 2);
 		stream.write(reinterpret_cast<const char *>(signature.data()), signature.size());
 
 		stream.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
@@ -121,33 +121,66 @@ void SArchiveMemory::delete_file(const std::string &path) {
 }
 
 void SArchiveMemory::load_from_serialised(const bytes_t &serialised) {
-	/*size_t offset = 0;
+	// TODO: Use primarily stream-focussed API like serialisation
+	size_t offset = 0;
 
 	SARC_RUNTIME_ASSERT(helpers::retrieve_multibyte<uint32_t>(serialised, offset) == SARC_MAGIC, malformed_headers,
 						"SArc magic missing");
 	offset += 4;
-	SARC_RUNTIME_ASSERT(serialised.at(offset++) == SARC_VERSION, version_mismatch, "SArc version mismatch");
+	SARC_RUNTIME_ASSERT(serialised[offset++] == SARC_VERSION, version_mismatch, "SArc version mismatch");
 
-	const auto file_count = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
-	offset += 4;
-	const auto crc32_checksum = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
+	const uint32_t block_count = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
 	offset += 4;
 
-	const auto decompressed_size = helpers::retrieve_multibyte<uint64_t>(serialised, offset);
-	offset += 8;
+	if (serialised[offset++] == std::byte{0x01}) {
+		const uint16_t signature_size = helpers::retrieve_multibyte<uint16_t>(serialised, offset);
+		offset += 2;
 
-	const bytes_t decompressed = helpers::lzma_decompress(std::span(serialised).subspan(offset), decompressed_size);
-	SARC_RUNTIME_ASSERT(helpers::calculate_crc32(decompressed) == crc32_checksum, corrupted_data,
-						"CRC32 checksum mismatch");
+		// helpers::verify_detached_pgg_signature(m_ffi, {serialised}, );
 
-	offset = 0;
-	for (int i = 0; i < file_count; ++i) {
-		const std::string file_path = helpers::retrieve_null_terminated_utf8(decompressed, offset);
-		offset += file_path.size() + 1;
-		const auto file_size = helpers::retrieve_multibyte<uint32_t>(decompressed, offset);
+		offset += signature_size;
+	}
+
+	for (uint32_t block = 0; block < block_count; block++) {
+		const uint8_t path_count = static_cast<uint8_t>(serialised[offset++]);
+
+		std::vector<std::string> paths;
+		paths.reserve(path_count);
+
+		for (uint8_t i = 0; i < path_count; i++) {
+			std::string s = helpers::retrieve_null_terminated_utf8(serialised, offset);
+
+			offset += s.size() + 1;
+			paths.push_back(s);
+		}
+
+		const uint32_t decompressed_crc32 = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
 		offset += 4;
 
-		this->add_file(SArchiveFile{decompressed, file_size, offset}, file_path);
-		offset += file_size;
-	}*/
+		const uint32_t decompressed_size = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
+		offset += 4;
+
+		const uint32_t compressed_size = helpers::retrieve_multibyte<uint32_t>(serialised, offset);
+		offset += 4;
+
+		bytes_t decompressed = helpers::lzma_decompress({serialised.data() + offset, compressed_size}, decompressed_size);
+		offset += compressed_size;
+
+		SARC_RUNTIME_ASSERT(helpers::calculate_crc32(decompressed) == decompressed_crc32, corrupted_data,
+							std::format("CRC32 for block {} incorrect", block));
+
+		uint32_t decompressed_offset = 0;
+
+		for (const auto &path : paths) {
+			const uint32_t file_size = helpers::retrieve_multibyte<uint32_t>(decompressed, decompressed_offset);
+			decompressed_offset += 4;
+
+			SArchiveFile &file = create_file(path);
+
+			file.data.resize(file_size);
+
+			std::memcpy(file.data.data(), decompressed.data() + decompressed_offset, file_size);
+			decompressed_offset += file_size;
+		}
+	}
 }

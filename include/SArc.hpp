@@ -25,7 +25,7 @@ typedef struct rnp_key_handle_st *rnp_key_handle_t;
 
 namespace SArc {
 	constexpr uint32_t SARC_MAGIC = 0x53417263; // "SArc" in ASCII
-	constexpr std::byte SARC_VERSION{0x01};
+	constexpr std::byte SARC_VERSION{0x02};
 
 	typedef std::vector<std::byte> bytes_t;
 	typedef std::span<std::byte> byte_span_t;
@@ -45,7 +45,6 @@ namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(malformed_headers);
 	SARC_ADD_RUNTIME_ERROR(version_mismatch);
 
-	SARC_ADD_RUNTIME_ERROR(invalid_signature);
 	SARC_ADD_RUNTIME_ERROR(invalid_gpg_data);
 	SARC_ADD_RUNTIME_ERROR(ffi_error);
 	SARC_ADD_RUNTIME_ERROR(sign_error);

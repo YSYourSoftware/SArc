@@ -40,7 +40,7 @@ Per block:
 
 `SArc`, `UnSArc` and `SArcSiVe` are provided for you to download over on the [releases page](https://github.com/YSYourSoftware/SArc/releases).
 
-These are simple packer, unpacker and signiture verification command-line executables.
+These are simple packer, unpacker and signature verification command-line executables.
 
 ```bash
 # Packs the current directory into 'out.sarc'
@@ -57,7 +57,7 @@ SArc -c <compression level>
 SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint>
 SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint> --pgp-sign-ps <key passphrase>
 
-# Verify a signiture
+# Verify a signature
 SArcSiVe <input archive> <public key>
 ```
 
