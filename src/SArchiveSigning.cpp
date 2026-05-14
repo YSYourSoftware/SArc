@@ -1,22 +1,22 @@
 #include "SArc.hpp"
 
+#include "SArc/Helpers.hpp"
+
 #include <rnp/rnp.h>
 #include <rnp/rnp_err.h>
 
 using namespace SArc;
 
+SArchiveMemory::SArchiveMemory() { p_init_ffi(); }
 SArchiveMemory::~SArchiveMemory() {
 	if (m_ffi) rnp_ffi_destroy(m_ffi);
 	if (m_signing_key) rnp_key_handle_destroy(m_signing_key);
+	if (m_signing_public_key) rnp_key_handle_destroy(m_signing_public_key);
 }
 
 void SArchiveMemory::sign(const byte_span_const_t &key, const std::string &key_passphrase,
 						  const pgp_fingerprint_t &key_fingerprint) {
 	rnp_input_t gpg_key;
-
-	if (!m_ffi)
-		SARC_RUNTIME_ASSERT(rnp_ffi_create(&m_ffi, RNP_KEYSTORE_GPG, RNP_KEYSTORE_GPG) == RNP_SUCCESS, ffi_error,
-							"Failed to create FFI object");
 
 	SARC_RUNTIME_ASSERT(
 		rnp_input_from_memory(&gpg_key, reinterpret_cast<const uint8_t *>(key.data()), key.size(), true) == RNP_SUCCESS,
@@ -30,18 +30,18 @@ void SArchiveMemory::sign(const byte_span_const_t &key, const std::string &key_p
 
 	m_signing_key_passphrase = key_passphrase;
 
-	std::ostringstream fp_stream;
-
-	for (const uint8_t b : key_fingerprint)
-		fp_stream << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
-
-	const std::string fp_hex = fp_stream.str();
+	const std::string fp_hex = helpers::fingerprint_to_hex_str(key_fingerprint);
 
 	SARC_RUNTIME_ASSERT(rnp_locate_key(m_ffi, "fingerprint", fp_hex.c_str(), &m_signing_key) == RNP_SUCCESS,
 						invalid_gpg_data, "Failed to locate signing key by fingerprint");
 }
 
-bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
+void SArchiveMemory::p_init_ffi() {
+	SARC_RUNTIME_ASSERT(rnp_ffi_create(&m_ffi, RNP_KEYSTORE_GPG, RNP_KEYSTORE_GPG) == RNP_SUCCESS, ffi_error,
+						"Failed to create FFI object");
+}
+
+bytes_t SArchiveMemory::p_sign_data(const byte_span_const_t &data) const {
 	rnp_input_t input = nullptr;
 	rnp_output_t output = nullptr;
 	rnp_op_sign_t sign = nullptr;
@@ -78,8 +78,7 @@ bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
 
 	SARC_RUNTIME_ASSERT(rnp_op_sign_add_signature(sign, m_signing_key, nullptr) == RNP_SUCCESS, sign_error,
 						"Failed to add signature");
-	SARC_RUNTIME_ASSERT(rnp_op_sign_execute(sign) == RNP_SUCCESS, sign_error,
-						"Failed to sign");
+	SARC_RUNTIME_ASSERT(rnp_op_sign_execute(sign) == RNP_SUCCESS, sign_error, "Failed to sign");
 	SARC_RUNTIME_ASSERT(rnp_output_memory_get_buf(output, &output_buf, &output_len, false) == RNP_SUCCESS, sign_error,
 						"Failed to get signed buffer");
 
@@ -94,3 +93,21 @@ bytes_t SArchiveMemory::sign_data(const byte_span_const_t &data) const {
 	return result;
 }
 
+void SArchiveMemory::p_load_public_key(const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint) {
+	rnp_input_t gpg_key;
+
+	SARC_RUNTIME_ASSERT(
+		rnp_input_from_memory(&gpg_key, reinterpret_cast<const uint8_t *>(public_key.data()), public_key.size(), true) == RNP_SUCCESS,
+		invalid_gpg_data, "Failed to load public key data");
+
+	SARC_RUNTIME_ASSERT(rnp_load_keys(m_ffi, RNP_KEYSTORE_GPG, gpg_key, RNP_LOAD_SAVE_PUBLIC_KEYS) == RNP_SUCCESS,
+						invalid_gpg_data, "Failed to load public keys from data");
+
+	rnp_input_destroy(gpg_key);
+	gpg_key = nullptr;
+
+	const std::string fp_hex = helpers::fingerprint_to_hex_str(key_fingerprint);
+
+	SARC_RUNTIME_ASSERT(rnp_locate_key(m_ffi, "fingerprint", fp_hex.c_str(), &m_signing_public_key) == RNP_SUCCESS,
+						invalid_gpg_data, "Failed to locate signing key by fingerprint");
+}

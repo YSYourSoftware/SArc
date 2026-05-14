@@ -23,11 +23,27 @@ namespace SArc::helpers {
 		bytes_t &buffer_;
 	};
 
+	class ConstBytesStream : public std::streambuf {
+	public:
+		explicit ConstBytesStream(const bytes_t &buffer) {
+			auto *begin = reinterpret_cast<const char *>(buffer.data());
+			auto *end = begin + buffer.size();
+			setg(const_cast<char *>(begin), const_cast<char *>(begin), const_cast<char *>(end));
+		}
+	};
+
 	class BytesOStream : public std::ostream {
 	public:
 		explicit BytesOStream(bytes_t &buffer) : std::ostream(&buf_), buf_(buffer) {}
 	private:
 		BytesStream buf_;
+	};
+
+	class BytesIStream : public std::istream {
+	public:
+		explicit BytesIStream(const bytes_t &buffer) : std::istream(&buf_), buf_(buffer) {}
+	private:
+		ConstBytesStream buf_;
 	};
 
 	template <typename T> void emplace_multibyte(bytes_t &bytes, T value) {
@@ -55,45 +71,58 @@ namespace SArc::helpers {
 		return static_cast<T>(value);
 	}
 
-	template <typename T> std::vector<uint8_t> to_big_endian(T value) {
+	template <typename T> [[nodiscard]] bytes_t to_big_endian(T value) {
 		static_assert(std::is_integral_v<T>, "T must be an integral type");
 
 		using UnsignedT = std::make_unsigned_t<T>;
 		auto uvalue = static_cast<UnsignedT>(value);
 
-		std::vector<uint8_t> bytes(sizeof(T));
+		bytes_t bytes(sizeof(T));
 
 		for (size_t i = 0; i < sizeof(T); ++i) {
-			bytes[sizeof(T) - 1 - i] = static_cast<uint8_t>(uvalue & 0xFF);
+			bytes[sizeof(T) - 1 - i] = static_cast<std::byte>(uvalue & 0xFF);
 			uvalue >>= 8;
 		}
 
 		return bytes;
 	}
 
-	typedef struct pgp_sigver_result {
+	template <typename T> [[nodiscard]] T from_big_endian(const byte_span_const_t &bytes) {
+		static_assert(std::is_integral_v<T>, "T must be an integral type");
+
+		if (bytes.size() != sizeof(T)) throw std::invalid_argument("Byte span size does not match target type size");
+
+		using UnsignedT = std::make_unsigned_t<T>;
+		UnsignedT value = 0;
+
+		for (std::byte b : bytes) { value = (value << 8) | static_cast<UnsignedT>(b); }
+
+		return static_cast<T>(value);
+	}
+
+	typedef struct {
 		bool valid;
 		pgp_fingerprint_t fingerprint;
 	} pgp_sigver_result_t;
 
-	file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
-								   const file_block_map_t &file_block_map);
+	[[nodiscard]] std::string read_null_terminated_utf8(std::istream &stream);
 
-	bytes_t read_file(const std::filesystem::path &path);
+	[[nodiscard]] bytes_t read_file(const std::filesystem::path &path);
 
-	size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
-	bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
-	bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
+	[[nodiscard]] file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
+												 const file_block_map_t &file_block_map);
 
-	void emplace_null_terminated_utf8(bytes_t &bytes, const std::string &string);
-	std::string retrieve_null_terminated_utf8(const byte_span_const_t &bytes, size_t offset);
+	[[nodiscard]] size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
+	[[nodiscard]] bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
+	[[nodiscard]] bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
 
-	uint32_t calculate_crc32(const bytes_t &data);
+	[[nodiscard]] uint32_t calculate_crc32(const bytes_t &data);
 
 	void archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
 											uint8_t compression_level, std::ostream &stream);
 
-	pgp_sigver_result_t verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
-													  std::istream &stream);
-	pgp_fingerprint_t hex_str_to_fingerprint(const std::string &hex);
+	[[nodiscard]] pgp_sigver_result_t verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
+																	std::istream &stream);
+	[[nodiscard]] pgp_fingerprint_t hex_str_to_fingerprint(const std::string &hex);
+	[[nodiscard]] std::string fingerprint_to_hex_str(const pgp_fingerprint_t &fingerprint);
 } // namespace SArc::helpers

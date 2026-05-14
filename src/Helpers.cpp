@@ -11,6 +11,25 @@
 
 using namespace SArc;
 
+std::string helpers::read_null_terminated_utf8(std::istream &stream) {
+	std::string result;
+	std::getline(stream, result, '\0');
+	return result;
+}
+
+bytes_t helpers::read_file(const std::filesystem::path &path) {
+	std::ifstream file(path, std::ios::binary | std::ios::ate);
+	if (!file) throw io_error("Cannot open file: " + path.string());
+
+	const std::streamsize size = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	bytes_t buffer(size);
+	if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) throw io_error("Cannot read file: " + path.string());
+
+	return buffer;
+}
+
 file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t target_block_size,
 										const file_block_map_t &file_block_map) {
 	file_block_map_t result{file_block_map};
@@ -47,19 +66,6 @@ file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t 
 	}
 
 	return result;
-}
-
-bytes_t helpers::read_file(const std::filesystem::path &path) {
-	std::ifstream file(path, std::ios::binary | std::ios::ate);
-	if (!file) throw io_error("Cannot open file: " + path.string());
-
-	const std::streamsize size = file.tellg();
-	file.seekg(0, std::ios::beg);
-
-	bytes_t buffer(size);
-	if (!file.read(reinterpret_cast<char *>(buffer.data()), size)) throw io_error("Cannot read file: " + path.string());
-
-	return buffer;
 }
 
 size_t helpers::lzma_get_compressed_size(const byte_span_const_t &data, const uint8_t level) {
@@ -147,26 +153,6 @@ bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t dec
 	return decompressed;
 }
 
-void helpers::emplace_null_terminated_utf8(bytes_t &bytes, const std::string &string) {
-	for (const char c : string) bytes.push_back(static_cast<std::byte>(c));
-	bytes.push_back(static_cast<std::byte>(0));
-}
-
-std::string helpers::retrieve_null_terminated_utf8(const byte_span_const_t &bytes, size_t offset) {
-	if (offset >= bytes.size()) throw std::out_of_range("Attempt to retrieve out of range");
-
-	std::string result;
-	while (offset < bytes.size()) {
-		const auto c = static_cast<unsigned char>(bytes[offset]);
-		offset++;
-
-		if (c == 0) break;
-		result.push_back(static_cast<char>(c));
-	}
-
-	return result;
-}
-
 uint32_t helpers::calculate_crc32(const bytes_t &data) {
 	return crc32buf(reinterpret_cast<const char *>(data.data()), data.size());
 }
@@ -200,7 +186,7 @@ void helpers::archive_serialise_blocks_to_stream(const SArchive &archive, const 
 		bytes_t block_data;
 		block_data.reserve(block_uncompressed_size);
 		for (const auto &path : paths) {
-			const SArchiveFile &file = archive[path];
+			const SArchiveMemoryFile &file = archive[path];
 			file.serialise_append(block_data);
 		}
 
@@ -233,20 +219,20 @@ helpers::pgp_sigver_result_t helpers::verify_detached_pgg_signature(rnp_ffi_t ff
 
 	try {
 		SARC_RUNTIME_ASSERT(rnp_input_from_callback(&data_input, &read_stream, nullptr, &stream) == RNP_SUCCESS,
-							std::runtime_error, "Failed to read data from stream.");
+							std::runtime_error, "Failed to read data from stream");
 		SARC_RUNTIME_ASSERT(rnp_input_from_memory(&signature_input, reinterpret_cast<const uint8_t *>(signature.data()),
 												  signature.size(), false) == RNP_SUCCESS,
-							std::runtime_error, "Failed to read signature data.");
+							std::runtime_error, "Failed to read signature data");
 
 		SARC_RUNTIME_ASSERT(rnp_op_verify_detached_create(&verify, ffi, data_input, signature_input) == RNP_SUCCESS,
-							ffi_error, "Failed to create detached verifier.");
+							ffi_error, "Failed to create detached verifier");
 
 		SARC_RUNTIME_ASSERT(rnp_op_verify_execute(verify) == RNP_SUCCESS, ffi_error,
-							"Failed to execute verification operation.");
+							"Failed to execute verification operation");
 
 		size_t signature_count = 0;
 		SARC_RUNTIME_ASSERT(rnp_op_verify_get_signature_count(verify, &signature_count) == RNP_SUCCESS, ffi_error,
-							"Failed to get signature count.");
+							"Failed to get signature count");
 
 		for (size_t i = 0; i < signature_count; i++) {
 			rnp_op_verify_signature_t s_verify_op = nullptr;
@@ -258,11 +244,11 @@ helpers::pgp_sigver_result_t helpers::verify_detached_pgg_signature(rnp_ffi_t ff
 				char *fp_buf = nullptr;
 
 				SARC_RUNTIME_ASSERT(rnp_op_verify_signature_get_key(s_verify_op, &signing_key) == RNP_SUCCESS,
-									ffi_error, "Failed to get key from signature.");
+									ffi_error, "Failed to get key from signature");
 
 				if (rnp_key_get_fprint(signing_key, &fp_buf) != RNP_SUCCESS) {
 					rnp_key_handle_destroy(signing_key);
-					throw invalid_gpg_data("Could not get fingerprint from signing key.");
+					throw invalid_gpg_data("Could not get fingerprint from signing key");
 				}
 
 				rnp_key_handle_destroy(signing_key);
@@ -283,7 +269,7 @@ helpers::pgp_sigver_result_t helpers::verify_detached_pgg_signature(rnp_ffi_t ff
 		rnp_input_destroy(signature_input);
 
 		return {false, {}};
-	} catch (const std::exception &exception) {
+	} catch (const std::exception &e) {
 		rnp_op_verify_destroy(verify);
 		rnp_input_destroy(data_input);
 		rnp_input_destroy(signature_input);
@@ -292,38 +278,39 @@ helpers::pgp_sigver_result_t helpers::verify_detached_pgg_signature(rnp_ffi_t ff
 	}
 }
 
-static uint32_t hex_to_u32(const uint8_t *src) {
-	uint32_t data;
-
-	std::memcpy(&data, src, 4);
-
-	const uint32_t t1 = (data + 0x06060606) >> 4;
-	const uint32_t t2 = data & 0x0F0F0F0F;
-	const uint32_t t3 = (data & 0x40404040) >> 6;
-
-	data = t1 & 0x0F0F0F0F;
-	data |= t2;
-	data += t3;
-
-	data = (data << 4) | (data >> 8);
-	data &= 0x00FF00FF;
-
-	return (data << 8) | (data >> 8);
+static uint8_t hex_val(const char c) {
+	if ('0' <= c && c <= '9') return c - '0';
+	if ('a' <= c && c <= 'f') return c - 'a' + 10;
+	if ('A' <= c && c <= 'F') return c - 'A' + 10;
+	throw std::invalid_argument("Invalid hex character");
 }
 
 pgp_fingerprint_t helpers::hex_str_to_fingerprint(const std::string &hex) {
+	SARC_RUNTIME_ASSERT(hex.length() == 40, std::invalid_argument, "Hex string not 40 chars long");
+
 	pgp_fingerprint_t out{};
 
-	const auto *src = reinterpret_cast<const uint8_t *>(hex.c_str());
-	uint8_t *dest = out.data();
+	for (uint8_t i = 0; i < 20; i++) {
+		const uint8_t hi = hex_val(hex[2 * i]);
+		const uint8_t lo = hex_val(hex[2 * i + 1]);
+		out[i] = (hi << 4) | lo;
+	}
 
-	for (int i = 0; i < 5; i++) {
-		uint32_t v = hex_to_u32(src);
+	return out;
+}
 
-		std::memcpy(dest, &v, 4);
+std::string helpers::fingerprint_to_hex_str(const pgp_fingerprint_t &fingerprint) {
+	static constexpr char hexmap[] = "0123456789ABCDEF";
 
-		src += 4;
-		dest += 4;
+	std::string out;
+	out.resize(40);
+
+	const uint8_t *src = fingerprint.data();
+
+	for (int i = 0; i < 20; i++) {
+		const uint8_t b = src[i];
+		out[2 * i] = hexmap[b >> 4];
+		out[2 * i + 1] = hexmap[b & 0x0F];
 	}
 
 	return out;

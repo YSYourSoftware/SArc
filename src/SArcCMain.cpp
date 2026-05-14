@@ -78,7 +78,7 @@ int main(const int argc, char *argv[]) {
 
 			std::cout << std::format("[" STC_BLUE "{}/{}" STC_RESET "] ", ++i, file_count) << entry_path << std::endl;
 
-			archive += SArchiveFile{entry.path()}.at(entry_path);
+			archive += SArchiveMemoryFile{entry.path()}.at(entry_path);
 		}
 
 		std::ofstream out{out_file, std::ios::binary};
