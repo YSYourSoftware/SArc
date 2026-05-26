@@ -2,6 +2,7 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -35,6 +36,8 @@ namespace SArc {
 
 	typedef std::unordered_map<std::string, uint32_t> file_block_map_t;
 
+	typedef std::function<void(float progress, const std::string &message)> progress_callback_t;
+
 	SARC_ADD_RUNTIME_ERROR(file_not_found_error);
 	SARC_ADD_RUNTIME_ERROR(file_already_exists_error);
 	SARC_ADD_RUNTIME_ERROR(io_error);
@@ -50,17 +53,22 @@ namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(ffi_error);
 	SARC_ADD_RUNTIME_ERROR(sign_error);
 
-	class SArchiveMemoryFile;
+	class SArchiveFile;
 
 	typedef struct {
 		const std::string &path;
-		SArchiveMemoryFile &file;
+		SArchiveFile *file;
 	} SArchiveFilePathPair;
 
 	typedef struct {
 		const std::string &path;
-		const SArchiveMemoryFile &file;
+		const SArchiveFile *file;
 	} SArchiveConstFilePathPair;
+
+	inline void void_progress_callback([[maybe_unused]] float progress, [[maybe_unused]] const std::string &message) {}
+	inline void print_progress_callback(const float progress, const std::string &message) {
+		std::printf("[%.2f%%] %s\n", progress * 100, message.c_str());
+	}
 
 	/**
 	 * <summary>
@@ -73,16 +81,27 @@ namespace SArc {
 
 		/**
 		 * <summary>
+		 * Check if this archive is streamed.
+		 * </summary>
+		 *
+		 * @returns <c>true</c> if streamed, else <c>false</c>.
+		 */
+		[[nodiscard]] virtual bool is_streamed() = 0;
+
+		/**
+		 * <summary>
 		 * Serialise this archive and all its files ready to write to disk.
 		 * </summary>
 		 *
 		 * @param compression_level LZMA compression level (0-9)
 		 * @param block_target_size Target block size, in bytes
 		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
+		 * @param progress_callback Progress callback to send progress updates to
 		 * @returns Byte vector of serialised data
 		 */
 		[[nodiscard]] virtual bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
-												const file_block_map_t &file_block_map) const = 0;
+												const file_block_map_t &file_block_map,
+												const progress_callback_t &progress_callback) const = 0;
 
 		/**
 		 * <summary>
@@ -93,9 +112,11 @@ namespace SArc {
 		 * @param stream Output data stream to write to
 		 * @param block_target_size Target block size, in bytes
 		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
+		 * @param progress_callback Progress callback to send progress updates to
 		 */
 		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
-										 const file_block_map_t &file_block_map) const = 0;
+										 const file_block_map_t &file_block_map,
+										 const progress_callback_t &progress_callback) const = 0;
 
 		/**
 		 * <summary>
@@ -103,10 +124,10 @@ namespace SArc {
 		 * </summary>
 		 *
 		 * @param path Path of file to find
-		 * @returns Reference to file
+		 * @returns Pointer to file
 		 * @throws file_not_found_error if file is not found in this archive
 		 */
-		[[nodiscard]] virtual SArchiveMemoryFile &get_file_by_path(const std::string &path) = 0;
+		[[nodiscard]] virtual SArchiveFile *get_file_by_path(const std::string &path) = 0;
 
 		/**
 		 * <summary>
@@ -114,10 +135,10 @@ namespace SArc {
 		 * </summary>
 		 *
 		 * @param path Path of file to find
-		 * @returns Const reference to file
+		 * @returns Const pointer to file
 		 * @throws file_not_found_error if file is not found in this archive
 		 */
-		[[nodiscard]] virtual const SArchiveMemoryFile &get_file_by_path_const(const std::string &path) const = 0;
+		[[nodiscard]] virtual const SArchiveFile *get_file_by_path_const(const std::string &path) const = 0;
 
 		/**
 		 * <summary>
@@ -137,7 +158,7 @@ namespace SArc {
 		 * @param path Path of this file
 		 * @throws file_already_exists_error if file with path already exists in this archive
 		 */
-		virtual void add_file(SArchiveMemoryFile file, const std::string &path) = 0;
+		virtual void add_file(SArchiveFile file, const std::string &path) = 0;
 
 		/**
 		 * <summary>
@@ -160,7 +181,7 @@ namespace SArc {
 		 * @returns Reference to new file
 		 * @throws file_already_exists_error if file with path already exists in this archive
 		 */
-		[[nodiscard]] virtual SArchiveMemoryFile &create_file(const std::string &path) = 0;
+		[[nodiscard]] virtual SArchiveFile &create_file(const std::string &path) = 0;
 
 		/**
 		 * <summary>
@@ -217,12 +238,12 @@ namespace SArc {
 		};
 
 		[[nodiscard]] iterator_range iterate() { return {this, get_all_paths()}; }
-		[[nodiscard]] const_iterator_range iterate() const { return {this, get_all_paths()}; }
+		[[nodiscard]] const_iterator_range const_iterate() const { return {this, get_all_paths()}; }
 
-		const SArchiveMemoryFile &operator[](const std::string &path) const { return get_file_by_path_const(path); }
+		const SArchiveFile *operator[](const std::string &path) const { return get_file_by_path_const(path); }
 
-		SArchiveMemoryFile &operator[](const std::string &path) { return get_file_by_path(path); }
-		SArchive &operator+=(const SArchiveMemoryFile &file);
+		SArchiveFile *operator[](const std::string &path) { return get_file_by_path(path); }
+		SArchive &operator+=(const SArchiveFile &file);
 		SArchive &operator+=(const SArchive &archive);
 		SArchive &operator-=(const std::string &path) {
 			delete_file(path);
@@ -235,9 +256,9 @@ namespace SArc {
 	 * A file stored within a <c>SArchive</c>.
 	 * </summary>
 	 */
-	class SArchiveMemoryFile {
+	class SArchiveFile {
 	public:
-		SArchiveMemoryFile() = default;
+		SArchiveFile() = default;
 
 		/**
 		 * <summary>
@@ -246,7 +267,7 @@ namespace SArc {
 		 *
 		 * @param data Data vector of the new <c>SArchiveFile</c>
 		 */
-		explicit SArchiveMemoryFile(bytes_t data);
+		explicit SArchiveFile(bytes_t data);
 
 		/**
 		 * <summary>
@@ -257,7 +278,7 @@ namespace SArc {
 		 * @param size Size of data to copy
 		 * @param offset Offset of data to copy
 		 */
-		explicit SArchiveMemoryFile(const bytes_t &data, size_t size, size_t offset);
+		explicit SArchiveFile(const bytes_t &data, size_t size, size_t offset);
 
 		/**
 		 * <summary>
@@ -266,7 +287,7 @@ namespace SArc {
 		 *
 		 * @param path Path of file to read into data vector
 		 */
-		explicit SArchiveMemoryFile(const std::filesystem::path &path);
+		explicit SArchiveFile(const std::filesystem::path &path);
 
 		/**
 		 * <summary>
@@ -276,7 +297,7 @@ namespace SArc {
 		 * @param stream Input stream to read into data vector
 		 * @param size Number of bytes to read from input stream
 		 */
-		explicit SArchiveMemoryFile(std::istream &stream, size_t size);
+		explicit SArchiveFile(std::istream &stream, size_t size);
 
 		/**
 		 * <summary>
@@ -298,7 +319,7 @@ namespace SArc {
 		 * archive += file.at("file.txt");
 		 * </code></example>
 		 */
-		SArchiveMemoryFile &at(const std::string &path) {
+		SArchiveFile &at(const std::string &path) {
 			m_as_path_t = path;
 			return *this;
 		}
@@ -311,7 +332,7 @@ namespace SArc {
 		bytes_t data;
 	private:
 		std::string m_as_path_t;
-		friend SArchive &SArchive::operator+=(const SArchiveMemoryFile &file);
+		friend SArchive &SArchive::operator+=(const SArchiveFile &file);
 	};
 
 	/**
@@ -324,28 +345,35 @@ namespace SArc {
 		SArchiveMemory();
 
 		explicit SArchiveMemory(const bytes_t &serialised);
-		explicit SArchiveMemory(const bytes_t &serialised, const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
+		explicit SArchiveMemory(const bytes_t &serialised, const byte_span_const_t &public_key,
+								const pgp_fingerprint_t &key_fingerprint);
 		explicit SArchiveMemory(const std::filesystem::path &path);
-		explicit SArchiveMemory(const std::filesystem::path &path, const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
+		explicit SArchiveMemory(const std::filesystem::path &path, const byte_span_const_t &public_key,
+								const pgp_fingerprint_t &key_fingerprint);
 		explicit SArchiveMemory(std::istream &stream);
-		explicit SArchiveMemory(std::istream &stream, const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
+		explicit SArchiveMemory(std::istream &stream, const byte_span_const_t &public_key,
+								const pgp_fingerprint_t &key_fingerprint);
 
 		~SArchiveMemory() override;
 
+		[[nodiscard]] bool is_streamed() override { return false; }
+
 		[[nodiscard]] bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
-										const file_block_map_t &file_block_map) const override;
+										const file_block_map_t &file_block_map,
+										const progress_callback_t &progress_callback) const override;
 
 		void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
-								 const file_block_map_t &file_block_map) const override;
+								 const file_block_map_t &file_block_map,
+								 const progress_callback_t &progress_callback) const override;
 
-		[[nodiscard]] SArchiveMemoryFile &get_file_by_path(const std::string &path) override;
-		[[nodiscard]] const SArchiveMemoryFile &get_file_by_path_const(const std::string &path) const override;
+		[[nodiscard]] SArchiveFile *get_file_by_path(const std::string &path) override;
+		[[nodiscard]] const SArchiveFile *get_file_by_path_const(const std::string &path) const override;
 		[[nodiscard]] std::vector<std::string> get_all_paths() const override;
 
-		void add_file(SArchiveMemoryFile file, const std::string &path) override;
+		void add_file(SArchiveFile file, const std::string &path) override;
 		void move_file(const std::string &old_path, const std::string &new_path) override;
 
-		[[nodiscard]] SArchiveMemoryFile &create_file(const std::string &path) override;
+		[[nodiscard]] SArchiveFile &create_file(const std::string &path) override;
 		void delete_file(const std::string &path) override;
 
 		/**
@@ -373,7 +401,7 @@ namespace SArc {
 		[[nodiscard]] bytes_t p_sign_data(const byte_span_const_t &data) const;
 		void p_load_public_key(const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
 
-		std::unordered_map<std::string, SArchiveMemoryFile> m_files;
+		std::unordered_map<std::string, SArchiveFile> m_files;
 
 		rnp_ffi_t m_ffi = nullptr;
 		rnp_key_handle_t m_signing_key = nullptr;
@@ -381,18 +409,18 @@ namespace SArc {
 		std::string m_signing_key_passphrase;
 	};
 
-	inline SArchive &SArchive::operator+=(const SArchiveMemoryFile &file) {
+	inline SArchive &SArchive::operator+=(const SArchiveFile &file) {
 		add_file(file, file.m_as_path_t);
 		return *this;
 	}
 
 	inline SArchive &SArchive::operator+=(const SArchive &archive) {
-		for (auto [path, file] : archive.iterate()) { add_file(file, path); }
+		for (const auto [path, file] : archive.const_iterate()) { add_file(*file, path); }
 		return *this;
 	}
 
 	inline std::ostream &operator<<(std::ostream &stream, const SArchive &archive) {
-		archive.serialise_to_stream(5, stream, UINT32_MAX, {});
+		archive.serialise_to_stream(5, stream, 128 << 20, {}, void_progress_callback);
 		return stream;
 	}
 

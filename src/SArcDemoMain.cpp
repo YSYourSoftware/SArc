@@ -20,11 +20,11 @@ int main() {
 					   "ttttteeeeeeeeeeeeeeddddddddddd dddddddddddddaaaaaaaaaaaatttttttttttttttttaaaaaaaaaaa";
 
 	{
-		SArchiveMemoryFile &file = archive.create_file("test.txt");
+		SArchiveFile &file = archive.create_file("test.txt");
 		file.data.resize(std::strlen(data));
 		std::memcpy(file.data.data(), data, std::strlen(data));
 
-		SArchiveMemoryFile &file1 = archive.create_file("test1.txt");
+		SArchiveFile &file1 = archive.create_file("test1.txt");
 		file1.data.resize(std::strlen(data1));
 		std::memcpy(file1.data.data(), data1, std::strlen(data1));
 	}
@@ -37,7 +37,7 @@ int main() {
 		archive.sign(std::span(secret_key), "password", pgp_fp);
 
 		std::ofstream out("test.sarc", std::ios::binary);
-		archive.serialise_to_stream(9, out, UINT32_MAX, {});
+		archive.serialise_to_stream(9, out, UINT32_MAX, {}, print_progress_callback);
 	}
 
 	{
@@ -45,11 +45,11 @@ int main() {
 		SArchiveMemory archive_reopen{reopen, helpers::read_file("public.asc"), pgp_fp};
 
 		SARC_RUNTIME_ASSERT(
-			std::memcmp(data, archive_reopen["test.txt"].data.data(), archive_reopen["test.txt"].data.size()) == 0,
+			std::memcmp(data, archive_reopen["test.txt"]->data.data(), archive_reopen["test.txt"]->data.size()) == 0,
 			std::runtime_error, "File content not equal to written");
 
 		SARC_RUNTIME_ASSERT(
-			std::memcmp(data1, archive_reopen["test1.txt"].data.data(), archive_reopen["test1.txt"].data.size()) == 0,
+			std::memcmp(data1, archive_reopen["test1.txt"]->data.data(), archive_reopen["test1.txt"]->data.size()) == 0,
 			std::runtime_error, "File content not equal to written");
 	}
 

@@ -19,6 +19,11 @@ int main(const int argc, char *argv[]) {
 	uint8_t compression_level = 5;
 	app.add_option("-c", compression_level, "LZMA compression level (0-9)")->default_val(5);
 
+	uint32_t target_block_size = 128 << 20;
+	app.add_option("-b", target_block_size, "Target block size")
+		->transform(CLI::AsSizeValue(true))
+		->default_str("128MiB");
+
 	bool follow_symlinks = false;
 	app.add_flag("--symlinks", follow_symlinks, "Follow symlinks")->default_str("false");
 
@@ -41,7 +46,7 @@ int main(const int argc, char *argv[]) {
 		SArchiveMemory archive;
 
 		if (!pgp_sign_fingerprint.empty()) {
-			SARC_RUNTIME_ASSERT(pgp_sign_fingerprint.length() != 40, std::invalid_argument,
+			SARC_RUNTIME_ASSERT(pgp_sign_fingerprint.length() == 40, std::invalid_argument,
 								"PGP fingerprint must be 40 characters long (20 hex bytes).");
 
 			std::ifstream key_file{pgp_sign_key, std::ios::binary};
@@ -78,13 +83,13 @@ int main(const int argc, char *argv[]) {
 
 			std::cout << std::format("[" STC_BLUE "{}/{}" STC_RESET "] ", ++i, file_count) << entry_path << std::endl;
 
-			archive += SArchiveMemoryFile{entry.path()}.at(entry_path);
+			archive += SArchiveFile{entry.path()}.at(entry_path);
 		}
 
 		std::ofstream out{out_file, std::ios::binary};
 		if (!out) throw io_error("Failed to open output file.");
 
-		out << archive;
+		archive.serialise_to_stream(compression_level, out, target_block_size, {}, print_progress_callback);
 
 		if (!out) throw io_error("Failed to write to output file.");
 

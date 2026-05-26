@@ -25,18 +25,14 @@ target_compile_features(SArcDemo PUBLIC cxx_std_23)
 if(SARC_BUILD_EXEC)
 	add_executable(SArcC    src/SArcCMain.cpp)
 	add_executable(SArcU    src/SArcUMain.cpp)
-	add_executable(SArcSiVe src/SArcSiVeMain.cpp)
+	add_executable(SArcInfo src/SArcInfoMain.cpp)
 
 	set_target_properties(SArcC PROPERTIES RUNTIME_OUTPUT_NAME "SArc")
 	set_target_properties(SArcU PROPERTIES RUNTIME_OUTPUT_NAME "UnSArc")
 
 	target_link_libraries(SArcC    PRIVATE SArc)
 	target_link_libraries(SArcU    PRIVATE SArc)
-	target_link_libraries(SArcSiVe PRIVATE SArc)
-
-	target_compile_features(SArcC    PUBLIC cxx_std_23)
-	target_compile_features(SArcU    PUBLIC cxx_std_23)
-	target_compile_features(SArcSiVe PUBLIC cxx_std_23)
+	target_link_libraries(SArcInfo PRIVATE SArc)
 endif()
 
 add_subdirectory(lib)

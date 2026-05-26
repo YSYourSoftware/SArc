@@ -96,9 +96,9 @@ bytes_t SArchiveMemory::p_sign_data(const byte_span_const_t &data) const {
 void SArchiveMemory::p_load_public_key(const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint) {
 	rnp_input_t gpg_key;
 
-	SARC_RUNTIME_ASSERT(
-		rnp_input_from_memory(&gpg_key, reinterpret_cast<const uint8_t *>(public_key.data()), public_key.size(), true) == RNP_SUCCESS,
-		invalid_gpg_data, "Failed to load public key data");
+	SARC_RUNTIME_ASSERT(rnp_input_from_memory(&gpg_key, reinterpret_cast<const uint8_t *>(public_key.data()),
+											  public_key.size(), true) == RNP_SUCCESS,
+						invalid_gpg_data, "Failed to load public key data");
 
 	SARC_RUNTIME_ASSERT(rnp_load_keys(m_ffi, RNP_KEYSTORE_GPG, gpg_key, RNP_LOAD_SAVE_PUBLIC_KEYS) == RNP_SUCCESS,
 						invalid_gpg_data, "Failed to load public keys from data");

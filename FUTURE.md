@@ -8,19 +8,21 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 ### Version 2
 
 - [X] PGP signing of archives
-- [ ] [Block architecture](plans/blocks.txt) rather than one blob
+- [X] [Block architecture](plans/blocks.txt) rather than one blob
 
 ### Version 3
 
 - [ ] AES256 and PGP encryption of archives
-- [ ] 64-bit size fields
 
 ## Library Features
 
-- [ ] `SArchiveStream` class to stream archives from the disk or network
-- [ ] Rewrite base in C and provide a C++ wrapper
+- [X] `SArchiveStream` class to stream archives from the disk or network
+- [X] `BlockEncoder` for less memory usage when compressing
+- [ ] `SArchive::get_file_by_path` & `SArchive::get_file_by_path_const` should return a shared pointer rather than
+  C-style pointer to avoid manual memory management
+- [ ] Add efficient way to append blocks to an archive stream
+- [ ] File type auto-mapping rather than filesystem order  
 
 ## Extra features
 
-- [ ] SArc debugger / fixer tool
 - [ ] 7-Zip plugin

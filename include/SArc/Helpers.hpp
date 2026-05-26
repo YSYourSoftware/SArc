@@ -17,7 +17,7 @@ namespace SArc::helpers {
 
 		int_type overflow(int_type ch) override {
 			if (ch != traits_type::eof()) { buffer_.push_back(static_cast<std::byte>(ch)); }
-			return ch;
+			return traits_type::not_eof(ch);
 		}
 	private:
 		bytes_t &buffer_;
@@ -26,9 +26,29 @@ namespace SArc::helpers {
 	class ConstBytesStream : public std::streambuf {
 	public:
 		explicit ConstBytesStream(const bytes_t &buffer) {
-			auto *begin = reinterpret_cast<const char *>(buffer.data());
-			auto *end = begin + buffer.size();
-			setg(const_cast<char *>(begin), const_cast<char *>(begin), const_cast<char *>(end));
+			auto *begin = reinterpret_cast<char *>(const_cast<std::byte *>(buffer.data()));
+
+			setg(begin, begin, begin + buffer.size());
+		}
+	protected:
+		pos_type seekoff(const off_type off, const std::ios_base::seekdir dir, const std::ios_base::openmode which) override {
+			if (!(which & std::ios_base::in)) return {static_cast<off_type>(-1)};
+
+			char *newpos = nullptr;
+
+			if (dir == std::ios_base::beg) newpos = eback() + off;
+			else if (dir == std::ios_base::cur) newpos = gptr() + off;
+			else if (dir == std::ios_base::end) newpos = egptr() + off;
+
+			if (newpos < eback() || newpos > egptr()) return {static_cast<off_type>(-1)};
+
+			setg(eback(), newpos, egptr());
+
+			return gptr() - eback();
+		}
+
+		pos_type seekpos(const pos_type sp, const std::ios_base::openmode which) override {
+			return seekoff(sp, std::ios_base::beg, which);
 		}
 	};
 
@@ -119,7 +139,8 @@ namespace SArc::helpers {
 	[[nodiscard]] uint32_t calculate_crc32(const bytes_t &data);
 
 	void archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
-											uint8_t compression_level, std::ostream &stream);
+											uint8_t compression_level, std::ostream &stream,
+											const progress_callback_t &progress_callback);
 
 	[[nodiscard]] pgp_sigver_result_t verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
 																	std::istream &stream);

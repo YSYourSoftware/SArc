@@ -8,8 +8,8 @@ if(SARC_BUILD_EXEC)
 	target_link_libraries(SArcU PRIVATE CLI11::CLI11)
 	target_include_directories(SArcU PRIVATE CLI11/include)
 
-	target_link_libraries(SArcSiVe PRIVATE CLI11::CLI11)
-	target_include_directories(SArcSiVe PRIVATE CLI11/include)
+	target_link_libraries(SArcInfo PRIVATE CLI11::CLI11)
+	target_include_directories(SArcInfo PRIVATE CLI11/include)
 endif()
 
 set(CRYPTO_BACKEND "botan")

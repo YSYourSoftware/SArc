@@ -44,19 +44,20 @@ SArchiveMemory::SArchiveMemory(std::istream &stream, const byte_span_const_t &pu
 }
 
 bytes_t SArchiveMemory::serialise(const uint8_t compression_level, const uint32_t block_target_size,
-								  const file_block_map_t &file_block_map) const {
+								  const file_block_map_t &file_block_map,
+								  const progress_callback_t &progress_callback) const {
 	bytes_t serialised;
 	helpers::BytesOStream out{serialised};
 
-	serialise_to_stream(compression_level, out, block_target_size, file_block_map);
+	serialise_to_stream(compression_level, out, block_target_size, file_block_map, progress_callback);
 
 	serialised.shrink_to_fit();
 	return serialised;
 }
 
 void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::ostream &stream,
-										 const uint32_t block_target_size,
-										 const file_block_map_t &file_block_map) const {
+										 const uint32_t block_target_size, const file_block_map_t &file_block_map,
+										 const progress_callback_t &progress_callback) const {
 	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
 						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
 
@@ -79,7 +80,8 @@ void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::o
 		bytes_t buffer;
 		helpers::BytesOStream out{buffer};
 
-		helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, out);
+		helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, out,
+													progress_callback);
 
 		const bytes_t signature = p_sign_data(buffer);
 
@@ -91,17 +93,18 @@ void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::o
 		return;
 	}
 
-	helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, stream);
+	helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, stream,
+												progress_callback);
 }
 
-SArchiveMemoryFile &SArchiveMemory::get_file_by_path(const std::string &path) {
+SArchiveFile *SArchiveMemory::get_file_by_path(const std::string &path) {
 	SARC_RUNTIME_ASSERT(this->m_files.contains(path), file_not_found_error, "No file at " + path + " in archive");
-	return this->m_files.find(path)->second;
+	return &this->m_files.find(path)->second;
 }
 
-const SArchiveMemoryFile &SArchiveMemory::get_file_by_path_const(const std::string &path) const {
+const SArchiveFile *SArchiveMemory::get_file_by_path_const(const std::string &path) const {
 	SARC_RUNTIME_ASSERT(this->m_files.contains(path), file_not_found_error, "No file at " + path + " in archive");
-	return this->m_files.find(path)->second;
+	return &this->m_files.find(path)->second;
 }
 
 std::vector<std::string> SArchiveMemory::get_all_paths() const {
@@ -113,7 +116,7 @@ std::vector<std::string> SArchiveMemory::get_all_paths() const {
 	return paths;
 }
 
-void SArchiveMemory::add_file(SArchiveMemoryFile file, const std::string &path) {
+void SArchiveMemory::add_file(SArchiveFile file, const std::string &path) {
 	SARC_RUNTIME_ASSERT(!this->m_files.contains(path), file_already_exists_error,
 						"File at " + path + " in archive already exists");
 	this->m_files.emplace(path, std::move(file));
@@ -131,11 +134,11 @@ void SArchiveMemory::move_file(const std::string &old_path, const std::string &n
 	this->m_files.insert(std::move(node));
 }
 
-SArchiveMemoryFile &SArchiveMemory::create_file(const std::string &path) {
+SArchiveFile &SArchiveMemory::create_file(const std::string &path) {
 	SARC_RUNTIME_ASSERT(!this->m_files.contains(path), file_already_exists_error,
 						"File at " + path + " in archive already exists");
 
-	auto [it, inserted] = this->m_files.emplace(path, SArchiveMemoryFile{});
+	auto [it, inserted] = this->m_files.emplace(path, SArchiveFile{});
 	return it->second;
 }
 
@@ -153,17 +156,17 @@ void SArchiveMemory::p_load_from_serialised(const bytes_t &serialised, const boo
 
 static helpers::pgp_sigver_result_t sarcmem_stream_verify_sig(std::istream &serialised, rnp_ffi_t ffi,
 															  const bool verify_signature) {
-	auto *tempvar_buf = new char[4];
+	std::array<uint8_t, 4> tempvar_buf{};
 
-	serialised.read(tempvar_buf, 2);
-	const auto signature_size = helpers::from_big_endian<uint16_t>({reinterpret_cast<std::byte *>(tempvar_buf), 2});
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 2);
+	const auto signature_size =
+		helpers::from_big_endian<uint16_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 2});
 
 	auto *signature_data = new char[signature_size];
 	serialised.read(signature_data, signature_size);
 
 	if (!verify_signature) {
 		delete[] signature_data;
-		delete[] tempvar_buf;
 
 		return {false, {}};
 	}
@@ -178,7 +181,6 @@ static helpers::pgp_sigver_result_t sarcmem_stream_verify_sig(std::istream &seri
 		serialised.seekg(block_data_offset, std::ios::beg);
 
 		delete[] signature_data;
-		delete[] tempvar_buf;
 
 		return result;
 	} catch (const std::exception &e) {
@@ -186,7 +188,6 @@ static helpers::pgp_sigver_result_t sarcmem_stream_verify_sig(std::istream &seri
 		serialised.seekg(block_data_offset, std::ios::beg);
 
 		delete[] signature_data;
-		delete[] tempvar_buf;
 		throw;
 	}
 }
@@ -194,79 +195,73 @@ static helpers::pgp_sigver_result_t sarcmem_stream_verify_sig(std::istream &seri
 void SArchiveMemory::p_load_from_serialised_stream(std::istream &serialised, const bool verify_signature,
 												   const byte_span_const_t &public_key,
 												   const pgp_fingerprint_t &key_fingerprint) {
-	auto *tempvar_buf = new char[4];
-	try {
-		serialised.read(tempvar_buf, 4);
-		SARC_RUNTIME_ASSERT(std::memcmp(tempvar_buf, helpers::to_big_endian<uint32_t>(SARC_MAGIC).data(), 4) == 0,
-							malformed_headers, "SArc magic missing");
+	std::array<uint8_t, 4> tempvar_buf{};
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+	SARC_RUNTIME_ASSERT(std::memcmp(tempvar_buf.data(), helpers::to_big_endian<uint32_t>(SARC_MAGIC).data(), 4) == 0,
+						malformed_headers, "SArc magic missing");
 
-		serialised.read(tempvar_buf, 1);
-		SARC_RUNTIME_ASSERT(*reinterpret_cast<std::byte *>(tempvar_buf) == SARC_VERSION, version_mismatch,
-							"SArc version mismatch");
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
+	SARC_RUNTIME_ASSERT(*reinterpret_cast<std::byte *>(tempvar_buf.data()) == SARC_VERSION, version_mismatch,
+						std::format("SArc version mismatch (expected {}, got {})", +static_cast<uint8_t>(SARC_VERSION),
+									+tempvar_buf[0]));
 
-		serialised.read(tempvar_buf, 4);
-		const auto block_count = helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf), 4});
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+	const auto block_count = helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
-		serialised.read(tempvar_buf, 1);
-		if (*tempvar_buf == 0x01) {
-			if (verify_signature) p_load_public_key(public_key, key_fingerprint);
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
+	if (tempvar_buf[0] == 0x01) {
+		if (verify_signature) p_load_public_key(public_key, key_fingerprint);
 
-			const auto [valid, fingerprint] = sarcmem_stream_verify_sig(serialised, m_ffi, verify_signature);
+		const auto [valid, fingerprint] = sarcmem_stream_verify_sig(serialised, m_ffi, verify_signature);
 
-			if (verify_signature) {
-				SARC_RUNTIME_ASSERT(valid, invalid_signature, "Signature not valid");
-				SARC_RUNTIME_ASSERT(std::memcmp(fingerprint.data(), key_fingerprint.data(), 20) == 0, invalid_signature,
-									std::format("Signature using incorrect fingerprint (expected {}, got {})",
-												helpers::fingerprint_to_hex_str(key_fingerprint),
-												helpers::fingerprint_to_hex_str(fingerprint)));
-			}
+		if (verify_signature) {
+			SARC_RUNTIME_ASSERT(valid, invalid_signature, "Signature not valid");
+			SARC_RUNTIME_ASSERT(std::memcmp(fingerprint.data(), key_fingerprint.data(), 20) == 0, invalid_signature,
+								std::format("Signature using incorrect fingerprint (expected {}, got {})",
+											helpers::fingerprint_to_hex_str(key_fingerprint),
+											helpers::fingerprint_to_hex_str(fingerprint)));
 		}
+	}
 
-		for (uint32_t block = 0; block < block_count; block++) {
-			serialised.read(tempvar_buf, 1);
-			const uint8_t file_count = *tempvar_buf;
+	for (uint32_t block = 0; block < block_count; block++) {
+		serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
+		const uint8_t file_count = tempvar_buf[0];
 
-			std::vector<std::string> paths;
-			paths.reserve(file_count);
+		std::vector<std::string> paths;
+		paths.reserve(file_count);
 
-			for (uint8_t i = 0; i < file_count; i++) paths.push_back(helpers::read_null_terminated_utf8(serialised));
+		for (uint8_t i = 0; i < file_count; i++) paths.push_back(helpers::read_null_terminated_utf8(serialised));
 
-			serialised.read(tempvar_buf, 4);
-			const uint32_t decompressed_crc32 =
-				helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf), 4});
+		serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		const uint32_t decompressed_crc32 =
+			helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
-			serialised.read(tempvar_buf, 4);
-			const uint32_t decompressed_size =
-				helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf), 4});
+		serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		const uint32_t decompressed_size =
+			helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
-			serialised.read(tempvar_buf, 4);
-			const uint32_t compressed_size =
-				helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf), 4});
+		serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		const uint32_t compressed_size =
+			helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
-			bytes_t compressed_data{compressed_size};
-			serialised.read(reinterpret_cast<char *>(compressed_data.data()), compressed_size);
+		bytes_t compressed_data{compressed_size};
+		serialised.read(reinterpret_cast<char *>(compressed_data.data()), compressed_size);
 
-			const bytes_t decompressed_data = helpers::lzma_decompress(compressed_data, decompressed_size);
-			helpers::BytesIStream in{decompressed_data};
+		const bytes_t decompressed_data = helpers::lzma_decompress(compressed_data, decompressed_size);
+		helpers::BytesIStream in{decompressed_data};
 
-			SARC_RUNTIME_ASSERT(decompressed_crc32 == helpers::calculate_crc32(decompressed_data), corrupted_data,
-								std::format("Block {} CRC32 mismatch", block));
+		SARC_RUNTIME_ASSERT(decompressed_crc32 == helpers::calculate_crc32(decompressed_data), corrupted_data,
+							std::format("Block {} CRC32 mismatch", block));
 
-			for (const auto &path : paths) {
-				in.read(tempvar_buf, 4);
-				const uint32_t file_size =
-					helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf), 4});
+		for (const auto &path : paths) {
+			in.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+			const uint32_t file_size =
+				helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
-				SArchiveMemoryFile &file = create_file(path);
-				file.data.resize(file_size);
+			SArchiveFile &file = create_file(path);
+			file.data.resize(file_size);
 
-				in.read(reinterpret_cast<char *>(file.data.data()), file_size);
-			}
+			in.read(reinterpret_cast<char *>(file.data.data()), file_size);
 		}
-
-		delete[] tempvar_buf;
-	} catch (const std::exception &e) {
-		delete[] tempvar_buf;
-		throw;
 	}
 }

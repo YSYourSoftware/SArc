@@ -1,4 +1,5 @@
 #include "SArc.hpp"
+#include "SArc/Streaming.hpp"
 #include "SArc/TermColour.hpp"
 
 #include <CLI/CLI.hpp>
@@ -18,27 +19,29 @@ int main(const int argc, char *argv[]) {
 
 	CLI11_PARSE(app, argc, argv);
 
-	try {
-		SArchiveMemory archive(in_file);
+	//try {
+		std::ifstream in_file_stream{in_file, std::ios::binary};
+		SArchiveStream archive{in_file_stream};
 
 		size_t file_count = archive.get_all_paths().size();
 
 		uint32_t i = 0;
-		for (auto [filepath, file] : archive.iterate()) {
+		for (const auto [filepath, file] : archive.const_iterate()) {
 			std::ofstream out(out_folder / filepath, std::ios::binary);
 			if (!out) throw io_error("Failed to open output file");
 
-			out.write(reinterpret_cast<const char *>(file.data.data()), file.data.size());
+			out.write(reinterpret_cast<const char *>(file->data.data()), file->data.size());
 			if (!out) throw io_error("Failed to write to output file");
 
 			std::cout << std::format("[" STC_BLUE "{}/{}" STC_RESET "] ", ++i, file_count) << filepath << std::endl;
+			delete file;
 		}
 
 		std::cout << STC_GREEN << "Extracted archive to " << STC_BOLDGREEN << out_folder << STC_RESET << std::endl;
-	} catch (std::exception &e) {
+	/*} catch (std::exception &e) {
 		std::cerr << STC_RED << e.what() << STC_RESET << std::endl;
 		return 1;
-	}
+	}*/
 
 	return 0;
 }
