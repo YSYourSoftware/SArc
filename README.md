@@ -51,7 +51,7 @@ SArc
 
 # Provide input and output paths:
 SArc    <input folder>   <output archive>
-UnSArc  <input archive>  [output folder]
+UnSArc  <input archive>  <output folder>
 
 # Provide a compression level
 SArc -c <compression level>
@@ -121,7 +121,7 @@ SArchiveMemory memory_archive = streamed_archive.load_into_memory(); // Load the
 memory_archive.sign(key, "my_passphrase", {0x01, 0x02, ...});
 ```
 
-See the [benchmarking page](https://yoursoftware.org/projects/SArc/speed?highlight=stream) for more details on benefits from
+See the [benchmarking page](https://yoursoftware.org/projects/SArc/benchmark?highlight=stream) for more details on benefits from
 SArc streaming.
 
 ### Block Encoding
