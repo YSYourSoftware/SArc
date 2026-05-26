@@ -13,6 +13,7 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 ### Version 3
 
 - [ ] AES256 and PGP encryption of archives
+- [ ] LZ4, LZMA and uncompressed options
 
 ## Library Features
 
