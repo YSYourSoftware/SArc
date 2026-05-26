@@ -1,9 +1,6 @@
 [submodule "lib/CLI11"]
 	path = lib/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
-[submodule "lib/crc-checksum"]
-	path = lib/crc-checksum
-	url = https://github.com/panzi/CRC-and-checksum-functions.git
 [submodule "lib/rnp"]
 	path = lib/rnp
 	url = https://github.com/rnpgp/rnp.git

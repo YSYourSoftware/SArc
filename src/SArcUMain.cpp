@@ -12,7 +12,7 @@ int main(const int argc, char *argv[]) {
 	CLI::App app;
 
 	std::filesystem::path in_file;
-	app.add_option("input", in_file, "Input File")->required();
+	app.add_option("input", in_file, "Input File")->check(CLI::ExistingFile)->required();
 
 	std::filesystem::path out_folder = ".";
 	app.add_option("output", out_folder, "Output Folder");

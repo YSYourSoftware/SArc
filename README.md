@@ -58,8 +58,8 @@ SArc -c <compression level>
 
 # Provide a target block size
 SArc -b 8MiB   # Faster streaming
-SArc -b 512MiB # Better compression
 SArc -b 128MiB # Balanced (default)
+SArc -b 512MiB # Better compression
 
 # Sign the archive using a PGP key
 SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint>
@@ -68,8 +68,8 @@ SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint> --pgp-sign-ps <key
 # Print useful information about an archive
 SArcInfo <input archive>
 
-# Verify a signature (can be used in scripts: returns 0 if valid and 1 if invalid)
-SArcInfo script-verify-signature <input archive> <public key> <public key fingerprint>
+# Verify a signature (can be used in scripts: returns 0 if valid, -1 if invalid, and 1 for any other error)
+SArcInfo <input archive> script-verify-signature <public key> <public key fingerprint>
 ```
 
 For more information, use `--help`.
