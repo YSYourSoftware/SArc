@@ -1,5 +1,6 @@
 #include "SArc.hpp"
-#include "Sarc/Helpers.hpp"
+#include "SArc/BlockEncoder.hpp"
+#include "SArc/Helpers.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -51,6 +52,29 @@ int main() {
 		SARC_RUNTIME_ASSERT(
 			std::memcmp(data1, archive_reopen["test1.txt"]->data.data(), archive_reopen["test1.txt"]->data.size()) == 0,
 			std::runtime_error, "File content not equal to written");
+	}
+
+	{
+		std::ofstream out("blockencode.sarc", std::ios::binary);
+		BlockEncoder block_encoder{out};
+
+		block_encoder.start_block();
+		block_encoder.block_add_file_path("test.txt");
+		block_encoder.block_add_file_path("test1.txt");
+
+		bytes_t file_data;
+
+		file_data.resize(std::strlen(data));
+		std::memcpy(file_data.data(), data, std::strlen(data));
+
+		block_encoder.block_add_file_data(file_data);
+
+		file_data.resize(std::strlen(data1));
+		std::memcpy(file_data.data(), data1, std::strlen(data1));
+
+		block_encoder.block_add_file_data(file_data);
+
+		block_encoder.end_block();
 	}
 
 	return 0;

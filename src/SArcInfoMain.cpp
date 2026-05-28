@@ -33,7 +33,7 @@ int main(const int argc, char *argv[]) {
 
 	CLI11_PARSE(app, argc, argv);
 
-	//try {
+	try {
 		std::fstream file{in_file, std::ios::binary};
 
 		if (script_verify_signature->parsed()) {
@@ -56,10 +56,10 @@ int main(const int argc, char *argv[]) {
 		SArchiveStream archive{file};
 
 		std::cout << STC_BOLDBLUE << archive.get_all_paths().size() << STC_BLUE << " files" << STC_RESET << std::endl;
-	/*} catch (std::exception &e) {
+	} catch (std::exception &e) {
 		std::cerr << STC_RED << e.what() << STC_RESET << std::endl;
 		return 1;
-	}*/
+	}
 
 	return 0;
 }

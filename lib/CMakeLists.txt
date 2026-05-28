@@ -25,6 +25,9 @@ target_sources(SArc PRIVATE
 	ccrc/crc_16f.c
 	ccrc/crc_32.c
 
+	lz4/lib/lz4.c
+	lz4/lib/lz4hc.c
+
 	lzma/Alloc.c
 	lzma/CpuArch.c
 	lzma/LzFind.c
@@ -38,5 +41,6 @@ target_sources(SArc PRIVATE
 
 target_include_directories(SArc PRIVATE
 	ccrc
+	lz4/lib
 	lzma
 )

@@ -19,7 +19,7 @@ int main(const int argc, char *argv[]) {
 
 	CLI11_PARSE(app, argc, argv);
 
-	//try {
+	try {
 		std::ifstream in_file_stream{in_file, std::ios::binary};
 		SArchiveStream archive{in_file_stream};
 
@@ -27,7 +27,7 @@ int main(const int argc, char *argv[]) {
 
 		uint32_t i = 0;
 		for (const auto [filepath, file] : archive.const_iterate()) {
-			std::ofstream out(out_folder / filepath, std::ios::binary);
+			std::ofstream out{out_folder / filepath, std::ios::binary};
 			if (!out) throw io_error("Failed to open output file");
 
 			out.write(reinterpret_cast<const char *>(file->data.data()), file->data.size());
@@ -38,10 +38,10 @@ int main(const int argc, char *argv[]) {
 		}
 
 		std::cout << STC_GREEN << "Extracted archive to " << STC_BOLDGREEN << out_folder << STC_RESET << std::endl;
-	/*} catch (std::exception &e) {
+	} catch (std::exception &e) {
 		std::cerr << STC_RED << e.what() << STC_RESET << std::endl;
 		return 1;
-	}*/
+	}
 
 	return 0;
 }

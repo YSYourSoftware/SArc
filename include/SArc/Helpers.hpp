@@ -31,7 +31,8 @@ namespace SArc::helpers {
 			setg(begin, begin, begin + buffer.size());
 		}
 	protected:
-		pos_type seekoff(const off_type off, const std::ios_base::seekdir dir, const std::ios_base::openmode which) override {
+		pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
+						 const std::ios_base::openmode which) override {
 			if (!(which & std::ios_base::in)) return {static_cast<off_type>(-1)};
 
 			char *newpos = nullptr;
@@ -130,6 +131,9 @@ namespace SArc::helpers {
 	[[nodiscard]] bytes_t read_file(const std::filesystem::path &path);
 
 	[[nodiscard]] file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
+												 const file_block_map_t &file_block_map);
+	[[nodiscard]] file_block_map_t auto_mappings(std::vector<std::string> files,
+												 const std::vector<uint32_t> &file_sizes, uint32_t target_block_size,
 												 const file_block_map_t &file_block_map);
 
 	[[nodiscard]] size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);

@@ -30,6 +30,14 @@ bytes_t helpers::read_file(const std::filesystem::path &path) {
 	return buffer;
 }
 
+static std::string_view get_extension(const std::string &file) {
+	const auto pos = file.rfind('.');
+
+	if (pos == std::string::npos) return {};
+
+	return std::string_view(file).substr(pos + 1);
+}
+
 file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t target_block_size,
 										const file_block_map_t &file_block_map) {
 	file_block_map_t result{file_block_map};
@@ -42,7 +50,16 @@ file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t 
 	for (const auto block : result | std::views::values)
 		if (block > latest_block) latest_block = block;
 
-	// TODO: Map by file extension rather than filesystem order
+	std::vector<std::string> files = archive.get_all_paths();
+	std::ranges::sort(files, [&](const std::string &a, const std::string &b) {
+		const std::string_view ext_a = get_extension(a);
+		const std::string_view ext_b = get_extension(b);
+
+		if (ext_a == ext_b) return a < b;
+
+		return ext_a < ext_b;
+	});
+
 	for (auto [path, file] : archive.const_iterate()) {
 		if (!result.contains(path)) {
 			uint64_t new_block_size = latest_block_size + file->data.size() + 4;
@@ -51,6 +68,55 @@ file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t 
 				latest_block++;
 				latest_block_files = 0;
 				new_block_size = file->data.size() + 4;
+			}
+
+			result[path] = latest_block;
+			latest_block_size = new_block_size;
+
+			latest_block_files++;
+
+			if (latest_block_size >= target_block_size) {
+				latest_block++;
+				latest_block_size = 0;
+			}
+		}
+	}
+
+	return result;
+}
+
+file_block_map_t helpers::auto_mappings(std::vector<std::string> files, const std::vector<uint32_t> &file_sizes,
+										const uint32_t target_block_size, const file_block_map_t &file_block_map) {
+	file_block_map_t result{file_block_map};
+
+	result.reserve(files.size());
+
+	uint8_t latest_block_files = 0;
+	uint32_t latest_block_size = 0;
+	uint32_t latest_block = 0;
+	for (const auto block : result | std::views::values)
+		if (block > latest_block) latest_block = block;
+
+	std::ranges::sort(files, [&](const std::string &a, const std::string &b) {
+		const std::string_view ext_a = get_extension(a);
+		const std::string_view ext_b = get_extension(b);
+
+		if (ext_a == ext_b) return a < b;
+
+		return ext_a < ext_b;
+	});
+
+	for (uint64_t i = 0; i < files.size(); i++) {
+		const std::string &path = files[i];
+		const uint32_t file_size = file_sizes[i];
+
+		if (!result.contains(path)) {
+			uint64_t new_block_size = latest_block_size + file_size + 4;
+
+			if (new_block_size > UINT32_MAX || latest_block_files >= UINT8_MAX) {
+				latest_block++;
+				latest_block_files = 0;
+				new_block_size = file_size + 4;
 			}
 
 			result[path] = latest_block;
@@ -196,8 +262,7 @@ void helpers::archive_serialise_blocks_to_stream(const SArchive &archive, const 
 
 		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_data.size()).data()), 4);
 
-		progress_callback(block / (block_count + 1.f),
-						  std::format("Compressing block {}/{}", block + 1, block_count));
+		progress_callback(block / (block_count + 1.f), std::format("Compressing block {}/{}", block + 1, block_count));
 		bytes_t compressed = lzma_compress(block_data, compression_level);
 
 		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(compressed.size()).data()), 4);

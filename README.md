@@ -53,8 +53,9 @@ SArc
 SArc    <input folder>   <output archive>
 UnSArc  <input archive>  <output folder>
 
-# Provide a compression level
-SArc -c <compression level>
+# Provide a compression algorithm and level
+SArc -c lzma:9
+SArc -c lz4:5
 
 # Provide a target block size
 SArc -b 8MiB   # Faster streaming
@@ -143,13 +144,16 @@ BlockEncoder sarc_encoder("archive.sarc"); // Write an archive to a file
 
 sarc_encoder.start_block();
 
-sarc_encoder.block_set_file_count(1);
 sarc_encoder.block_add_file_path("hello_world.txt");
+sarc_encoder.block_add_file_path("other_file.txt");
 
 // File data must be added in the same order as file paths were added
 bytes_t data;
-data.resize();
+data.resize(13);
 std::memcpy(data.data(), "Hello, World!", 13);
+sarc_encoder.block_add_file_data(data);
+
+std::memcpy(data.data(), "Other file...", 13);
 sarc_encoder.block_add_file_data(data);
 
 sarc_encoder.end_block();

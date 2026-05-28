@@ -1,6 +1,6 @@
 #include "SArc.hpp"
 
-#include "Sarc/Helpers.hpp"
+#include "SArc/Helpers.hpp"
 
 #include <fstream>
 #include <iostream>
