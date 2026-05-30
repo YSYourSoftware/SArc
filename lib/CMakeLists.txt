@@ -12,7 +12,7 @@ if(SARC_BUILD_EXEC)
 	target_include_directories(SArcInfo PRIVATE CLI11/include)
 endif()
 
-set(CRYPTO_BACKEND "botan")
+set(CRYPTO_BACKEND "openssl")
 add_subdirectory(rnp)
 
 target_link_libraries(SArc PRIVATE librnp)

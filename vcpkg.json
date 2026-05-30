@@ -3,7 +3,7 @@
   "version-string": "2.0.0",
   "license": "WTFPL",
   "dependencies": [
-    "botan",
+    "openssl",
     "bzip2",
     "dirent",
     "getopt",

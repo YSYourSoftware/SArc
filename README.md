@@ -1,12 +1,10 @@
 # SArc
 
 SArc is a simple archive format used primarily in [YourSoftware](https://YourSoftware.org) applications.
-It currently officially supports 1 compression format:
+It currently officially supports 2 compression formats:
 
 - LZMA
-
-> [!NOTE]
-> All other compression schemes were dropped in v1.
+- LZ4
 
 ## Format
 
@@ -14,11 +12,11 @@ It currently officially supports 1 compression format:
 > SArc is a **big-endian** format, that is to say all multibyte integer and float values are stored in the big-endian
 > byte order.
 
-The format of SArc v2 goes as follows:
+The format of SArc v3 goes as follows:
 
 ```text
 Magic value                 0x53417263 (SArc)
-Version                     0x02
+Version                     0x03
 Block count                 UInt32
 PGP signed flag             UInt8
 If PGP:
@@ -30,6 +28,7 @@ Per block:
     File path - Null-terminated UTF-8 string (use forward-slashes `/` to seperate folders)
                 (the order of paths denotes the order files are stored in)
   Decompressed block CRC32  UInt32
+  Compression enum          UInt8
   Decompressed block size   UInt32
   Compressed block size     UInt32
   Compressed:
@@ -54,8 +53,9 @@ SArc    <input folder>   <output archive>
 UnSArc  <input archive>  <output folder>
 
 # Provide a compression algorithm and level
-SArc -c lzma:9
-SArc -c lz4:5
+SArc -c lzma:9 # LZMA prioritises size over speed and CPU usage (lzma:5 is default)
+SArc -c lz4:5  # LZ4 prioritises speed and CPU usage over size and is excellent for streaming
+SArc -c none:0
 
 # Provide a target block size
 SArc -b 8MiB   # Faster streaming
