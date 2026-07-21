@@ -17,14 +17,14 @@ namespace SArc {
 
 		[[nodiscard]] bool is_streamed() override { return true; }
 
-		[[nodiscard]] bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
-										const file_block_map_t &file_block_map,
+		[[nodiscard]] bytes_t serialise(CompressionType compression_type, uint8_t compression_level,
+										uint32_t block_target_size, const file_block_map_t &file_block_map,
 										const progress_callback_t &progress_callback) const override {
 			throw stream_not_supported("Streamed archives don't support serialisation");
 		}
 
-		void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
-								 const file_block_map_t &file_block_map,
+		void serialise_to_stream(CompressionType compression_type, uint8_t compression_level, std::ostream &stream,
+								 uint32_t block_target_size, const file_block_map_t &file_block_map,
 								 const progress_callback_t &progress_callback) const override {
 			throw stream_not_supported("Streamed archives don't support serialisation");
 		}

@@ -72,7 +72,8 @@ struct encoded_block_data {
 
 static encoded_block_data sarcbenc_encode_block(const uint32_t decompressed_size,
 												const std::vector<bytes_t> &block_files_data,
-												const uint8_t compression_level) {
+												const uint8_t compression_level,
+												const CompressionType compression_type) {
 	uint32_t cursor = 0;
 	bytes_t decompressed_data{decompressed_size};
 
@@ -84,16 +85,33 @@ static encoded_block_data sarcbenc_encode_block(const uint32_t decompressed_size
 		cursor += data.size();
 	}
 
-	return {helpers::lzma_compress(decompressed_data, compression_level), helpers::calculate_crc32(decompressed_data)};
+	switch (compression_type) {
+	case NONE:
+		return {decompressed_data, helpers::calculate_crc32(decompressed_data)};
+	case LZMA:
+		return {helpers::lzma_compress(decompressed_data, compression_level), helpers::calculate_crc32(decompressed_data)};
+	case LZ4:
+		return {helpers::lz4_compress(decompressed_data, compression_level), helpers::calculate_crc32(decompressed_data)};
+	}
 }
 
-void BlockEncoder::end_block(const uint8_t compression_level) {
+void BlockEncoder::end_block(const CompressionType compression_type, const uint8_t compression_level) {
 	SARC_RUNTIME_ASSERT(m_state == IN_BLOCK_FILE_DATA, state_error, "end_block can only be called when in file data");
 	SARC_RUNTIME_ASSERT(m_block_written_file_count == m_block_target_file_count, std::underflow_error,
 						"Not enough files added");
 
-	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
-						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
+	switch (compression_type) {
+	case NONE: break;
+	case LZMA:
+		SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
+							"Compression level must satisfy 0 <= compresison_level <= 9 for LZMA");
+		break;
+	case LZ4:
+		SARC_RUNTIME_ASSERT(compression_level <= 12, std::invalid_argument,
+							"Compression level must satisfy 0 <= compresison_level <= 12 for LZ4");
+		break;
+	default: throw std::invalid_argument("Unrecognised compression type");
+	}
 
 	m_stream.seekp(m_block_file_count_offset);
 	m_stream.write(reinterpret_cast<const char *>(&m_block_written_file_count), 1);
@@ -102,10 +120,11 @@ void BlockEncoder::end_block(const uint8_t compression_level) {
 	for (const auto &data : m_block_files_data) decompressed_size += data.size() + 4;
 
 	const auto [compressed_data, decompressed_crc32] =
-		sarcbenc_encode_block(decompressed_size, m_block_files_data, compression_level);
+		sarcbenc_encode_block(decompressed_size, m_block_files_data, compression_level, compression_type);
 
 	m_stream.seekp(m_block_size_headers_offset);
 	m_stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(decompressed_crc32).data()), 4);
+	m_stream.write(reinterpret_cast<const char *>(&compression_type), 1);
 	m_stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(decompressed_size).data()), 4);
 	m_stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(compressed_data.size()).data()), 4);
 

@@ -18,10 +18,9 @@ The format of SArc v3 goes as follows:
 Magic value                 0x53417263 (SArc)
 Version                     0x03
 Block count                 UInt32
-PGP signed flag             UInt8
-If PGP:
-  PGP signature size        UInt16
-  PGP signature data
+Feature flag                UInt8 (1 = PGP signed, 2 = AES encrypted)
+If AES:
+  Initialisation vector     16 Byte Buffer
 Per block:
   File count                UInt8
   Per file:
@@ -31,10 +30,13 @@ Per block:
   Compression enum          UInt8
   Decompressed block size   UInt32
   Compressed block size     UInt32
-  Compressed:
+  Compressed (optionally encrypted after compression):
    Per file:
      Data length            UInt32
      Data
+If PGP:
+  PGP signature size        UInt16
+  PGP signature data
 ```
 
 ## Creating, Unpacking & Verifying Archives

@@ -12,10 +12,16 @@ if(SARC_BUILD_EXEC)
 	target_include_directories(SArcInfo PRIVATE CLI11/include)
 endif()
 
+set(BUILD_TESTING OFF)
 set(CRYPTO_BACKEND "openssl")
 add_subdirectory(rnp)
 
-target_link_libraries(SArc PRIVATE librnp)
+find_package(OpenSSL CONFIG REQUIRED)
+target_link_libraries(SArc PRIVATE
+	librnp
+	OpenSSL
+	OpenSSL::Crypto
+)
 
 target_sources(SArc PRIVATE
 	ccrc/arccrc16.c

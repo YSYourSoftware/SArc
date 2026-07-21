@@ -136,9 +136,14 @@ namespace SArc::helpers {
 												 const std::vector<uint32_t> &file_sizes, uint32_t target_block_size,
 												 const file_block_map_t &file_block_map);
 
-	[[nodiscard]] size_t lzma_get_compressed_size(const byte_span_const_t &data, uint8_t level = 5);
 	[[nodiscard]] bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
 	[[nodiscard]] bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
+
+	[[nodiscard]] bytes_t lz4_compress(const byte_span_const_t &data, uint8_t level = 5);
+	[[nodiscard]] bytes_t lz4_decompress(const byte_span_const_t &data, size_t decompressed_size);
+
+	[[nodiscard]] bytes_t oneshot_aes256_encrypt(const byte_span_const_t &data, const std::string &passphrase);
+	[[nodiscard]] bytes_t oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase);
 
 	[[nodiscard]] uint32_t calculate_crc32(const bytes_t &data);
 

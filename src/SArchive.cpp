@@ -43,23 +43,34 @@ SArchiveMemory::SArchiveMemory(std::istream &stream, const byte_span_const_t &pu
 	p_load_from_serialised_stream(stream, true, public_key, key_fingerprint);
 }
 
-bytes_t SArchiveMemory::serialise(const uint8_t compression_level, const uint32_t block_target_size,
-								  const file_block_map_t &file_block_map,
+bytes_t SArchiveMemory::serialise(const CompressionType compression_type, const uint8_t compression_level,
+								  const uint32_t block_target_size, const file_block_map_t &file_block_map,
 								  const progress_callback_t &progress_callback) const {
 	bytes_t serialised;
 	helpers::BytesOStream out{serialised};
 
-	serialise_to_stream(compression_level, out, block_target_size, file_block_map, progress_callback);
+	serialise_to_stream(compression_type, compression_level, out, block_target_size, file_block_map, progress_callback);
 
 	serialised.shrink_to_fit();
 	return serialised;
 }
 
-void SArchiveMemory::serialise_to_stream(const uint8_t compression_level, std::ostream &stream,
-										 const uint32_t block_target_size, const file_block_map_t &file_block_map,
+void SArchiveMemory::serialise_to_stream(const CompressionType compression_type, const uint8_t compression_level,
+										 std::ostream &stream, const uint32_t block_target_size,
+										 const file_block_map_t &file_block_map,
 										 const progress_callback_t &progress_callback) const {
-	SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
-						"Compression lavel must satisfy 0 <= compresison_level <= 9 for LZMA");
+	switch (compression_type) {
+	case NONE: break;
+	case LZMA:
+		SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
+							"Compression level must satisfy 0 <= compresison_level <= 9 for LZMA");
+		break;
+	case LZ4:
+		SARC_RUNTIME_ASSERT(compression_level <= 12, std::invalid_argument,
+							"Compression level must satisfy 0 <= compresison_level <= 12 for LZ4");
+		break;
+	default: throw std::invalid_argument("Unrecognised compression type");
+	}
 
 	const bool pgp_signed = m_signing_key != nullptr;
 	const file_block_map_t final_file_block_map = helpers::auto_mappings(*this, block_target_size, file_block_map);

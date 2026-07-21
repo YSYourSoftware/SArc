@@ -2,6 +2,12 @@
 
 #include <LzmaLib.h>
 #include <crc.h>
+#include <lz4.h>
+#include <lz4hc.h>
+#include <openssl/aes.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/sha.h>
 #include <rnp/rnp.h>
 #include <rnp/rnp_err.h>
 
@@ -134,37 +140,6 @@ file_block_map_t helpers::auto_mappings(std::vector<std::string> files, const st
 	return result;
 }
 
-size_t helpers::lzma_get_compressed_size(const byte_span_const_t &data, const uint8_t level) {
-	size_t compressed_size = data.size() + data.size() / 3 + 128;
-
-	uint8_t props[LZMA_PROPS_SIZE];
-	size_t props_size = LZMA_PROPS_SIZE;
-
-	bytes_t compressed(props_size + compressed_size);
-
-	int result = LzmaCompress(reinterpret_cast<Byte *>(compressed.data() + props_size), &compressed_size,
-							  reinterpret_cast<const Byte *>(data.data()), data.size(), props, &props_size, level, 0,
-							  -1, -1, -1, -1, -1);
-
-	if (result == SZ_ERROR_OUTPUT_EOF) {
-		compressed_size = data.size();
-		compressed.resize(props_size + compressed_size);
-
-		result = LzmaCompress(reinterpret_cast<Byte *>(compressed.data() + props_size), &compressed_size,
-							  reinterpret_cast<const Byte *>(data.data()), data.size(), props, &props_size, level, 0,
-							  -1, -1, -1, -1, -1);
-	}
-
-	if (result == SZ_ERROR_MEM) throw memory_error("LZMA: Memory allocation error");
-	if (result == SZ_ERROR_PARAM) throw std::invalid_argument("LZMA: Invalid parameters");
-	if (result == SZ_ERROR_OUTPUT_EOF)
-		throw memory_error("LZMA: Compressed data too large (try a higher compression level)");
-	if (result == SZ_ERROR_THREAD) throw thread_error("LZMA: Error in multithreading funcitons");
-	if (result != SZ_OK) throw std::runtime_error("LZMA: Unknown error in compression");
-
-	return props_size + compressed_size;
-}
-
 bytes_t helpers::lzma_compress(const byte_span_const_t &data, const uint8_t level) {
 	size_t compressed_size = data.size() + data.size() / 3 + 128;
 
@@ -218,6 +193,65 @@ bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t dec
 
 	return decompressed;
 }
+
+bytes_t helpers::lz4_compress(const byte_span_const_t &data, const uint8_t level) {
+	bytes_t result;
+	result.resize(LZ4_compressBound(data.size()));
+
+	if (level < 5) {
+		const int32_t size =
+			LZ4_compress_fast(reinterpret_cast<const char *>(data.data()), reinterpret_cast<char *>(result.data()),
+							  data.size(), result.size(), level == 0 ? 17 : std::roundf(level / 5.f * 17.f));
+		SARC_RUNTIME_ASSERT(size > 0, std::runtime_error, "LZ4: Error in compression");
+		result.resize(size);
+	} else {
+		const int32_t size =
+			LZ4_compress_HC(reinterpret_cast<const char *>(data.data()), reinterpret_cast<char *>(result.data()),
+							data.size(), result.size(), level);
+		SARC_RUNTIME_ASSERT(size > 0, std::runtime_error, "LZ4HC: Error in compression");
+		result.resize(size);
+	}
+
+	return result;
+}
+
+bytes_t helpers::lz4_decompress(const byte_span_const_t &data, const size_t decompressed_size) {
+	bytes_t result;
+	result.resize(decompressed_size);
+
+	SARC_RUNTIME_ASSERT(LZ4_decompress_safe(reinterpret_cast<const char *>(data.data()),
+											reinterpret_cast<char *>(result.data()), data.size(),
+											result.size()) == decompressed_size,
+						std::runtime_error, "LZ4: Error in decompression");
+
+	return result;
+}
+
+bytes_t helpers::oneshot_aes256_encrypt(const byte_span_const_t &data, const std::string &passphrase) {
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> hash{};
+	std::array<uint8_t, 16> aes_iv{};
+
+	RAND_bytes(aes_iv.data(), aes_iv.size());
+	SHA256(reinterpret_cast<const unsigned char *>(passphrase.c_str()), data.size(), hash.data());
+
+	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	EVP_EncryptInit(ctx, EVP_aes_256_cbc(), hash.data(), aes_iv.data());
+
+	std::array<uint8_t, 1204> ciphertext{};
+	int32_t len;
+
+	EVP_EncryptUpdate(ctx, ciphertext.data(), &len, reinterpret_cast<const unsigned char *>(data.data()), data.size());
+
+	int32_t ciphertext_len = len;
+
+	EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+
+	ciphertext_len += len;
+
+	EVP_CIPHER_CTX_free(ctx);
+}
+
+bytes_t helpers::oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase) {}
 
 uint32_t helpers::calculate_crc32(const bytes_t &data) {
 	return crc32buf(reinterpret_cast<const char *>(data.data()), data.size());

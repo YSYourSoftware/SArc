@@ -65,6 +65,8 @@ namespace SArc {
 		const SArchiveFile *file;
 	} SArchiveConstFilePathPair;
 
+	enum CompressionType : uint8_t { NONE = 0, LZMA = 1, LZ4 = 2 };
+
 	inline void void_progress_callback([[maybe_unused]] float progress, [[maybe_unused]] const std::string &message) {}
 	inline void print_progress_callback(const float progress, const std::string &message) {
 		std::printf("[%.2f%%] %s\n", progress * 100, message.c_str());
@@ -93,14 +95,15 @@ namespace SArc {
 		 * Serialise this archive and all its files ready to write to disk.
 		 * </summary>
 		 *
-		 * @param compression_level LZMA compression level (0-9)
+		 * @param compression_type Compression algorith (if any) to use
+		 * @param compression_level Compression level (0-9 for LZMA, 0-12 for LZ4)
 		 * @param block_target_size Target block size, in bytes
 		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
 		 * @param progress_callback Progress callback to send progress updates to
 		 * @returns Byte vector of serialised data
 		 */
-		[[nodiscard]] virtual bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
-												const file_block_map_t &file_block_map,
+		[[nodiscard]] virtual bytes_t serialise(CompressionType compression_type, uint8_t compression_level,
+												uint32_t block_target_size, const file_block_map_t &file_block_map,
 												const progress_callback_t &progress_callback) const = 0;
 
 		/**
@@ -108,13 +111,15 @@ namespace SArc {
 		 * Serialise this archive and all its files to a stream.
 		 * </summary>
 		 *
+		 * @param compression_type Compression algorith (if any) to use
 		 * @param compression_level LZMA compression level (0-9)
 		 * @param stream Output data stream to write to
 		 * @param block_target_size Target block size, in bytes
 		 * @param file_block_map File to block mappings, if a file is not present, automatic mapping will be used
 		 * @param progress_callback Progress callback to send progress updates to
 		 */
-		virtual void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
+		virtual void serialise_to_stream(CompressionType compression_type, uint8_t compression_level,
+										 std::ostream &stream, uint32_t block_target_size,
 										 const file_block_map_t &file_block_map,
 										 const progress_callback_t &progress_callback) const = 0;
 
@@ -358,12 +363,12 @@ namespace SArc {
 
 		[[nodiscard]] bool is_streamed() override { return false; }
 
-		[[nodiscard]] bytes_t serialise(uint8_t compression_level, uint32_t block_target_size,
-										const file_block_map_t &file_block_map,
+		[[nodiscard]] bytes_t serialise(CompressionType compression_type, uint8_t compression_level,
+										uint32_t block_target_size, const file_block_map_t &file_block_map,
 										const progress_callback_t &progress_callback) const override;
 
-		void serialise_to_stream(uint8_t compression_level, std::ostream &stream, uint32_t block_target_size,
-								 const file_block_map_t &file_block_map,
+		void serialise_to_stream(CompressionType compression_type, uint8_t compression_level, std::ostream &stream,
+								 uint32_t block_target_size, const file_block_map_t &file_block_map,
 								 const progress_callback_t &progress_callback) const override;
 
 		[[nodiscard]] SArchiveFile *get_file_by_path(const std::string &path) override;

@@ -11,6 +11,7 @@ option(SARC_BUILD_EXEC "Build SArcTool executables" ON)
 add_library(SArc STATIC)
 target_include_directories(SArc PUBLIC include)
 target_compile_features(SArc PUBLIC cxx_std_23)
+target_compile_definitions(SArc PUBLIC OPENSSL_NO_DEPRECATED)
 
 if(MSVC)
 	target_compile_options(SArc PRIVATE
@@ -23,15 +24,15 @@ target_link_libraries(SArcDemo PRIVATE SArc)
 target_compile_features(SArcDemo PUBLIC cxx_std_23)
 
 if(SARC_BUILD_EXEC)
-	add_executable(SArcC    src/SArcCMain.cpp)
-	add_executable(SArcU    src/SArcUMain.cpp)
+	add_executable(SArcC src/SArcCMain.cpp)
+	add_executable(SArcU src/SArcUMain.cpp)
 	add_executable(SArcInfo src/SArcInfoMain.cpp)
 
 	set_target_properties(SArcC PROPERTIES RUNTIME_OUTPUT_NAME "SArc")
 	set_target_properties(SArcU PROPERTIES RUNTIME_OUTPUT_NAME "UnSArc")
 
-	target_link_libraries(SArcC    PRIVATE SArc)
-	target_link_libraries(SArcU    PRIVATE SArc)
+	target_link_libraries(SArcC PRIVATE SArc)
+	target_link_libraries(SArcU PRIVATE SArc)
 	target_link_libraries(SArcInfo PRIVATE SArc)
 endif()
 

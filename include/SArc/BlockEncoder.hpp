@@ -14,7 +14,7 @@ namespace SArc {
 		void block_add_file_path(const std::string &path);
 		void block_add_file_data(const bytes_t &data);
 
-		void end_block(uint8_t compression_level = 5);
+		void end_block(CompressionType compression_type = LZMA, uint8_t compression_level = 5);
 	private:
 		enum State : uint8_t { OUT_OF_BLOCK = 0, IN_BLOCK_HEADERS = 1, IN_BLOCK_FILE_DATA = 2 };
 
