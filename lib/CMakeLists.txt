@@ -19,7 +19,6 @@ add_subdirectory(rnp)
 find_package(OpenSSL CONFIG REQUIRED)
 target_link_libraries(SArc PRIVATE
 	librnp
-	OpenSSL
 	OpenSSL::Crypto
 )
 

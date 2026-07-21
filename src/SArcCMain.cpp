@@ -134,7 +134,7 @@ int main(const int argc, char *argv[]) {
 			std::ofstream out{out_file, std::ios::binary};
 			if (!out) throw io_error("Failed to open output file.");
 
-			archive.serialise_to_stream(compression_level, out, target_block_size, {}, print_progress_callback);
+			archive.serialise_to_stream(LZMA, compression_level, out, target_block_size, {}, print_progress_callback);
 
 			if (!out) throw io_error("Failed to write to output file.");
 

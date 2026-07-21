@@ -38,7 +38,7 @@ int main() {
 		archive.sign(std::span(secret_key), "password", pgp_fp);
 
 		std::ofstream out("test.sarc", std::ios::binary);
-		archive.serialise_to_stream(9, out, UINT32_MAX, {}, print_progress_callback);
+		archive.serialise_to_stream(LZMA, 9, out, UINT32_MAX, {}, print_progress_callback);
 	}
 
 	{

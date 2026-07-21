@@ -425,7 +425,7 @@ namespace SArc {
 	}
 
 	inline std::ostream &operator<<(std::ostream &stream, const SArchive &archive) {
-		archive.serialise_to_stream(5, stream, 128 << 20, {}, void_progress_callback);
+		archive.serialise_to_stream(LZMA, 5, stream, 128 << 20, {}, void_progress_callback);
 		return stream;
 	}
 

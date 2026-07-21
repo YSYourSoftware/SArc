@@ -38,19 +38,3 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	target_compile_options(SArc PRIVATE
-		/permissive-
-		/W4
-		/w14640
-	)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" || CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	target_compile_options(SArc PRIVATE
-		-Wall
-		-Wextra
-		-Wshadow
-		-Wnon-virtual-dtor
-		-pedantic
-	)
-endif()

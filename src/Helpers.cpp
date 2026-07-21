@@ -249,9 +249,14 @@ bytes_t helpers::oneshot_aes256_encrypt(const byte_span_const_t &data, const std
 	ciphertext_len += len;
 
 	EVP_CIPHER_CTX_free(ctx);
+
+	return {};
 }
 
-bytes_t helpers::oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase) {}
+bytes_t helpers::oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase) {
+	throw std::runtime_error("Not implemented");
+	return {};
+}
 
 uint32_t helpers::calculate_crc32(const bytes_t &data) {
 	return crc32buf(reinterpret_cast<const char *>(data.data()), data.size());
