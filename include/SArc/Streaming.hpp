@@ -5,7 +5,7 @@
 namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(stream_not_supported);
 
-	class SArchiveStream : public SArchive {
+	class SARC_API SArchiveStream : public SArchive {
 	public:
 		SArchiveStream();
 

@@ -7,11 +7,12 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
 
 ### Version 3
 
-- [ ] LZ4hc, LZMA and uncompressed options
+- [X] LZ4hc, LZMA and uncompressed options
+- [X] Switch to RSA signatures from PGP
 
 ### Version 4
 
-- [ ] AES256 and PGP encryption of archives
+- [ ] AES256 and RSA encryption of archives
 
 ## Library Features
 
@@ -21,8 +22,4 @@ If you have a feature suggestion, feel free to [submit an issue](https://github.
   C-style pointer to avoid manual memory management
 - [ ] Add efficient way to append blocks to an archive stream
 - [X] File type auto-mapping rather than filesystem order 
-- [ ] Move away from RNP to avoid linking to JSON-C, ZLib and BZip2
-
-## Extra features
-
-- [ ] 7-Zip plugin
+- [X] Move away from RNP to avoid linking to JSON-C, ZLib and BZip2

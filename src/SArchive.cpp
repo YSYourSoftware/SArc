@@ -8,39 +8,29 @@
 
 using namespace SArc;
 
-SArchiveMemory::SArchiveMemory(const bytes_t &serialised) {
-	p_init_ffi();
-	p_load_from_serialised(serialised, false, {}, {});
-}
+SArchiveMemory::SArchiveMemory(const bytes_t &serialised) { p_load_from_serialised(serialised, false, {}, nullptr); }
 
 SArchiveMemory::SArchiveMemory(const bytes_t &serialised, const byte_span_const_t &public_key,
-							   const pgp_fingerprint_t &key_fingerprint) {
-	p_init_ffi();
+							   const sha256_hash_t *key_fingerprint) {
 	p_load_from_serialised(serialised, true, public_key, key_fingerprint);
 }
 
 SArchiveMemory::SArchiveMemory(const std::filesystem::path &path) {
-	p_init_ffi();
 	std::ifstream in{path};
-	p_load_from_serialised_stream(in, false, {}, {});
+	p_load_from_serialised_stream(in, false, {}, nullptr);
 }
 
 SArchiveMemory::SArchiveMemory(const std::filesystem::path &path, const byte_span_const_t &public_key,
-							   const pgp_fingerprint_t &key_fingerprint) {
-	p_init_ffi();
+							   const sha256_hash_t *key_fingerprint) {
 	std::ifstream in{path};
 	p_load_from_serialised_stream(in, true, public_key, key_fingerprint);
 }
 
-SArchiveMemory::SArchiveMemory(std::istream &stream) {
-	p_init_ffi();
-	p_load_from_serialised_stream(stream, false, {}, {});
-}
+SArchiveMemory::SArchiveMemory(std::istream &stream) { p_load_from_serialised_stream(stream, false, {}, nullptr); }
 
 SArchiveMemory::SArchiveMemory(std::istream &stream, const byte_span_const_t &public_key,
-							   const pgp_fingerprint_t &key_fingerprint) {
-	p_init_ffi();
-	p_load_from_serialised_stream(stream, true, public_key, key_fingerprint);
+							   const sha256_hash_t *key_fingerprint) {
+	p_load_from_serialised_stream(stream, true, public_key, nullptr);
 }
 
 bytes_t SArchiveMemory::serialise(const CompressionType compression_type, const uint8_t compression_level,
@@ -60,19 +50,19 @@ void SArchiveMemory::serialise_to_stream(const CompressionType compression_type,
 										 const file_block_map_t &file_block_map,
 										 const progress_callback_t &progress_callback) const {
 	switch (compression_type) {
-	case NONE: break;
-	case LZMA:
+	case CompressionType::NONE: break;
+	case CompressionType::LZMA:
 		SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
 							"Compression level must satisfy 0 <= compresison_level <= 9 for LZMA");
 		break;
-	case LZ4:
+	case CompressionType::LZ4:
 		SARC_RUNTIME_ASSERT(compression_level <= 12, std::invalid_argument,
 							"Compression level must satisfy 0 <= compresison_level <= 12 for LZ4");
 		break;
 	default: throw std::invalid_argument("Unrecognised compression type");
 	}
 
-	const bool pgp_signed = m_signing_key != nullptr;
+	const bool rsa_signed = m_signing_key != nullptr;
 	const file_block_map_t final_file_block_map = helpers::auto_mappings(*this, block_target_size, file_block_map);
 
 	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(SARC_MAGIC).data()), 4);
@@ -84,17 +74,18 @@ void SArchiveMemory::serialise_to_stream(const CompressionType compression_type,
 
 	stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_count).data()), 4);
 
-	const uint8_t temp = pgp_signed ? 0x01 : 0x00;
+	const uint8_t temp = rsa_signed ? 0x01 : 0x00;
 	stream.write(reinterpret_cast<const char *>(&temp), 1);
 
-	if (pgp_signed) {
+	if (rsa_signed) {
+		// TODO: find a way to stream this, maybe use an std::iostream
 		bytes_t buffer;
 		helpers::BytesOStream out{buffer};
 
 		helpers::archive_serialise_blocks_to_stream(*this, final_file_block_map, compression_level, out,
 													progress_callback);
 
-		const bytes_t signature = p_sign_data(buffer);
+		const bytes_t signature = helpers::sign_data(buffer, *m_signing_key);
 
 		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint16_t>(signature.size()).data()), 2);
 		stream.write(reinterpret_cast<const char *>(signature.data()), signature.size());
@@ -159,53 +150,62 @@ void SArchiveMemory::delete_file(const std::string &path) {
 }
 
 void SArchiveMemory::p_load_from_serialised(const bytes_t &serialised, const bool verify_signature,
-											const byte_span_const_t &public_key,
-											const pgp_fingerprint_t &key_fingerprint) {
+											const byte_span_const_t &public_key, const sha256_hash_t *key_fingerprint) {
 	helpers::BytesIStream stream{serialised};
 	p_load_from_serialised_stream(stream, verify_signature, public_key, key_fingerprint);
 }
 
-static helpers::pgp_sigver_result_t sarcmem_stream_verify_sig(std::istream &serialised, rnp_ffi_t ffi,
-															  const bool verify_signature) {
-	std::array<uint8_t, 4> tempvar_buf{};
+static bool sarcmem_stream_verify_sig(std::istream &stream, const bool verify_signature,
+									  const byte_span_const_t &public_key) {
+	std::array<std::byte, 4> tempvar_buf;
+	stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 2);
+	const auto signature_size = helpers::from_big_endian<uint16_t>(tempvar_buf);
 
-	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 2);
-	const auto signature_size =
-		helpers::from_big_endian<uint16_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 2});
+	bytes_t signature_data;
+	signature_data.resize(signature_size);
+	stream.read(reinterpret_cast<char *>(signature_data.data()), signature_size);
 
-	auto *signature_data = new char[signature_size];
-	serialised.read(signature_data, signature_size);
+	if (!verify_signature) return true;
 
-	if (!verify_signature) {
-		delete[] signature_data;
+	const std::istream::pos_type return_pos = stream.tellg();
 
-		return {false, {}};
+	stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+	const auto block_count = helpers::from_big_endian<uint32_t>(tempvar_buf);
+
+	size_t total_size = 0;
+
+	for (uint32_t i = 0; i < block_count; i++) {
+		++total_size;
+		stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
+		const auto file_count = static_cast<uint8_t>(tempvar_buf[0]);
+
+		for (uint8_t v = 0; v < file_count; v++) {
+			std::string name = helpers::read_null_terminated_utf8(stream);
+			total_size += name.size();
+		}
+
+		total_size += 4 + 1 + 4 + 4;
+
+		stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		total_size += helpers::from_big_endian<uint32_t>(tempvar_buf);
+
+		stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
+		total_size += static_cast<uint8_t>(tempvar_buf[0]);
+
+		stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		total_size += helpers::from_big_endian<uint32_t>(tempvar_buf);
+
+		stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+		total_size += helpers::from_big_endian<uint32_t>(tempvar_buf);
 	}
 
-	const std::streamsize block_data_offset = serialised.tellg();
-
-	try {
-		const helpers::pgp_sigver_result_t result = helpers::verify_detached_pgg_signature(
-			ffi, {reinterpret_cast<std::byte *>(signature_data), signature_size}, serialised);
-
-		serialised.clear();
-		serialised.seekg(block_data_offset, std::ios::beg);
-
-		delete[] signature_data;
-
-		return result;
-	} catch (const std::exception &e) {
-		serialised.clear();
-		serialised.seekg(block_data_offset, std::ios::beg);
-
-		delete[] signature_data;
-		throw;
-	}
+	stream.seekg(return_pos);
+	// TODO: streamd sigverify func
 }
 
 void SArchiveMemory::p_load_from_serialised_stream(std::istream &serialised, const bool verify_signature,
 												   const byte_span_const_t &public_key,
-												   const pgp_fingerprint_t &key_fingerprint) {
+												   const sha256_hash_t *key_fingerprint) {
 	std::array<uint8_t, 4> tempvar_buf{};
 	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
 	SARC_RUNTIME_ASSERT(std::memcmp(tempvar_buf.data(), helpers::to_big_endian<uint32_t>(SARC_MAGIC).data(), 4) == 0,
@@ -216,23 +216,25 @@ void SArchiveMemory::p_load_from_serialised_stream(std::istream &serialised, con
 						std::format("SArc version mismatch (expected {}, got {})", +static_cast<uint8_t>(SARC_VERSION),
 									+tempvar_buf[0]));
 
-	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
-	const auto block_count = helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
-
 	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);
-	if (tempvar_buf[0] == 0x01) {
-		if (verify_signature) p_load_public_key(public_key, key_fingerprint);
-
-		const auto [valid, fingerprint] = sarcmem_stream_verify_sig(serialised, m_ffi, verify_signature);
+	if (tempvar_buf[0] & static_cast<uint8_t>(FeatureFlags::RSA_SIGNATURE)) {
+		const sha256_hash_t fingerprint = helpers::fingerprint_key(public_key);
+		const bool valid = sarcmem_stream_verify_sig(serialised, verify_signature, public_key);
 
 		if (verify_signature) {
 			SARC_RUNTIME_ASSERT(valid, invalid_signature, "Signature not valid");
-			SARC_RUNTIME_ASSERT(std::memcmp(fingerprint.data(), key_fingerprint.data(), 20) == 0, invalid_signature,
-								std::format("Signature using incorrect fingerprint (expected {}, got {})",
-											helpers::fingerprint_to_hex_str(key_fingerprint),
-											helpers::fingerprint_to_hex_str(fingerprint)));
+			SARC_RUNTIME_ASSERT(
+				(std::memcmp(fingerprint.data(), key_fingerprint->data(), 20) == 0 && key_fingerprint) ||
+					!key_fingerprint,
+				invalid_signature,
+				std::format("Signature using incorrect fingerprint (expected {}, got {})",
+							helpers::fingerprint_to_hex_str(*key_fingerprint),
+							helpers::fingerprint_to_hex_str(fingerprint)));
 		}
 	}
+
+	serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 4);
+	const auto block_count = helpers::from_big_endian<uint32_t>({reinterpret_cast<std::byte *>(tempvar_buf.data()), 4});
 
 	for (uint32_t block = 0; block < block_count; block++) {
 		serialised.read(reinterpret_cast<char *>(tempvar_buf.data()), 1);

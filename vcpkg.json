@@ -3,20 +3,6 @@
   "version-string": "2.0.0",
   "license": "WTFPL",
   "dependencies": [
-    "openssl",
-    "bzip2",
-    "dirent",
-    "getopt",
-    {
-      "name": "gmp",
-      "platform": "!windows"
-    },
-    "json-c",
-    {
-      "name": "mpir",
-      "platform": "windows"
-    },
-    "zlib",
-    "lz4"
+    "openssl"
   ]
 }

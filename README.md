@@ -17,10 +17,14 @@ The format of SArc v3 goes as follows:
 ```text
 Magic value                 0x53417263 (SArc)
 Version                     0x03
+Feature flag                UInt8 (1 = RSA signed)
+If RSA:
+  RSA signature size        UInt16
+  RSA signature data
+  
+=== Signatures start using data from here on ===
+
 Block count                 UInt32
-Feature flag                UInt8 (1 = PGP signed, 2 = AES encrypted)
-If AES:
-  Initialisation vector     16 Byte Buffer
 Per block:
   File count                UInt8
   Per file:
@@ -34,9 +38,6 @@ Per block:
    Per file:
      Data length            UInt32
      Data
-If PGP:
-  PGP signature size        UInt16
-  PGP signature data
 ```
 
 ## Creating, Unpacking & Verifying Archives
@@ -64,9 +65,8 @@ SArc -b 8MiB   # Faster streaming
 SArc -b 128MiB # Balanced (default)
 SArc -b 512MiB # Better compression
 
-# Sign the archive using a PGP key
-SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint>
-SArc --pgp-sign <private key> --pgp-sign-fp <key fingerprint> --pgp-sign-ps <key passphrase>
+# Sign the archive using an RSA key
+SArc --sign <private key>
 
 # Print useful information about an archive
 SArcInfo <input archive>
@@ -97,8 +97,8 @@ subfolder called `SArc`.
 Allows streaming of archives from the disk or the network. Streaming large archives can help reduce memory usage.
 
 > [!NOTE]
-> Signing archives is not possible using streamed archives.
-> Use `memory_archive.sign(...);` on a memory-loaded archive to achieve this.
+> Editing streamed archives is not possible.
+> Load the archive into memory to achieve this.
 
 > [!CAUTION]
 > Streamed archives allocate new `SArchiveFile` objects on calls to `get_file_by_path_const`, remember to `delete` them,
@@ -121,7 +121,7 @@ archive_magic(streamed_archive); // SArchiveStream inherits SArchive
 
 // Certain actions require an archive loaded in memory, like signing
 SArchiveMemory memory_archive = streamed_archive.load_into_memory(); // Load the archive into memory
-memory_archive.sign(key, "my_passphrase", {0x01, 0x02, ...});
+memory_archive.sign(key);
 ```
 
 See the [benchmarking page](https://yoursoftware.org/projects/SArc/benchmark?highlight=stream) for more details on benefits from

@@ -9,8 +9,22 @@
 #include <utility>
 #include <vector>
 
+#ifdef SARC_IN_SARC_BUILD
+#ifdef WIN32
+#define SARC_API __declspec(dllexport)
+#elif __GNUC__ || __clang__
+#define SARC_API [[gnu::dllexport]]
+#endif
+#else
+#ifdef WIN32
+#define SARC_API __declspec(dllimport)
+#elif __GNUC__ || __clang__
+#define SARC_API [[gnu::dllimport]]
+#endif
+#endif
+
 #define SARC_ADD_RUNTIME_ERROR(name)                                                                                   \
-	class name : public std::runtime_error {                                                                           \
+	class SARC_API name : public std::runtime_error {                                                                  \
 	public:                                                                                                            \
 		explicit name(const std::string &message) : std::runtime_error(message) {}                                     \
 		explicit name(const char *message) : std::runtime_error(message) {}                                            \
@@ -21,18 +35,15 @@
 		if (!(condition)) throw error_type(message);                                                                   \
 	} while (0)
 
-typedef struct rnp_ffi_st *rnp_ffi_t;
-typedef struct rnp_key_handle_st *rnp_key_handle_t;
-
 namespace SArc {
 	constexpr uint32_t SARC_MAGIC = 0x53417263; // "SArc" in ASCII
-	constexpr std::byte SARC_VERSION{0x02};
+	constexpr std::byte SARC_VERSION{0x03};
 
 	typedef std::vector<std::byte> bytes_t;
 	typedef std::span<std::byte> byte_span_t;
 	typedef std::span<const std::byte> byte_span_const_t;
 
-	typedef std::array<uint8_t, 20> pgp_fingerprint_t;
+	typedef std::array<std::byte, 32> sha256_hash_t;
 
 	typedef std::unordered_map<std::string, uint32_t> file_block_map_t;
 
@@ -48,12 +59,11 @@ namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(malformed_headers);
 	SARC_ADD_RUNTIME_ERROR(version_mismatch);
 
-	SARC_ADD_RUNTIME_ERROR(invalid_gpg_data);
+	SARC_ADD_RUNTIME_ERROR(invalid_rsa_data);
 	SARC_ADD_RUNTIME_ERROR(invalid_signature);
-	SARC_ADD_RUNTIME_ERROR(ffi_error);
 	SARC_ADD_RUNTIME_ERROR(sign_error);
 
-	class SArchiveFile;
+	class SARC_API SArchiveFile;
 
 	typedef struct {
 		const std::string &path;
@@ -65,10 +75,12 @@ namespace SArc {
 		const SArchiveFile *file;
 	} SArchiveConstFilePathPair;
 
-	enum CompressionType : uint8_t { NONE = 0, LZMA = 1, LZ4 = 2 };
+	enum class CompressionType : uint8_t { NONE = 0, LZMA = 1, LZ4 = 2 };
+	enum class FeatureFlags : uint8_t { NONE = 0, RSA_SIGNATURE = 1, AES_ENCRYPTION = 2, RSA_ENCRYPTION = 4 };
 
-	inline void void_progress_callback([[maybe_unused]] float progress, [[maybe_unused]] const std::string &message) {}
-	inline void print_progress_callback(const float progress, const std::string &message) {
+	inline SARC_API void void_progress_callback([[maybe_unused]] float progress,
+												[[maybe_unused]] const std::string &message) {}
+	inline SARC_API void print_progress_callback(const float progress, const std::string &message) {
 		std::printf("[%.2f%%] %s\n", progress * 100, message.c_str());
 	}
 
@@ -77,7 +89,7 @@ namespace SArc {
 	 * Base class for all SArc archives.
 	 * </summary>
 	 */
-	class SArchive {
+	class SARC_API SArchive {
 	public:
 		virtual ~SArchive() = default;
 
@@ -261,7 +273,7 @@ namespace SArc {
 	 * A file stored within a <c>SArchive</c>.
 	 * </summary>
 	 */
-	class SArchiveFile {
+	class SARC_API SArchiveFile {
 	public:
 		SArchiveFile() = default;
 
@@ -345,19 +357,19 @@ namespace SArc {
 	 * A SArc archive in memory.
 	 * </summary>
 	 */
-	class SArchiveMemory : public SArchive {
+	class SARC_API SArchiveMemory : public SArchive {
 	public:
 		SArchiveMemory();
 
 		explicit SArchiveMemory(const bytes_t &serialised);
 		explicit SArchiveMemory(const bytes_t &serialised, const byte_span_const_t &public_key,
-								const pgp_fingerprint_t &key_fingerprint);
+								const sha256_hash_t *key_fingerprint = nullptr);
 		explicit SArchiveMemory(const std::filesystem::path &path);
 		explicit SArchiveMemory(const std::filesystem::path &path, const byte_span_const_t &public_key,
-								const pgp_fingerprint_t &key_fingerprint);
+								const sha256_hash_t *key_fingerprint = nullptr);
 		explicit SArchiveMemory(std::istream &stream);
 		explicit SArchiveMemory(std::istream &stream, const byte_span_const_t &public_key,
-								const pgp_fingerprint_t &key_fingerprint);
+								const sha256_hash_t *key_fingerprint = nullptr);
 
 		~SArchiveMemory() override;
 
@@ -383,35 +395,21 @@ namespace SArc {
 
 		/**
 		 * <summary>
-		 * Sign the archive using a GPG format secret key.
+		 * Sign the archive using an RSA private key.
 		 * </summary>
 		 *
-		 * @param key Secret key data
-		 * @param key_passphrase Secret key passphrase
-		 * @param key_fingerprint Fingerprint of secret key
-		 * @throws invalid_gpg_data if the key failed to load
-		 * @throws ffi_error if initialising or using the FFI object fails
+		 * @param key Private RSA key
+		 * @throws invalid_rsa_data if the key failed to load
 		 */
-		void sign(const byte_span_const_t &key, const std::string &key_passphrase,
-				  const pgp_fingerprint_t &key_fingerprint);
+		void sign(const byte_span_const_t &key);
 	private:
-		void p_init_ffi();
-
 		void p_load_from_serialised(const bytes_t &serialised, bool verify_signature,
-									const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
+									const byte_span_const_t &public_key, const sha256_hash_t *key_fingerprint);
 		void p_load_from_serialised_stream(std::istream &serialised, bool verify_signature,
-										   const byte_span_const_t &public_key,
-										   const pgp_fingerprint_t &key_fingerprint);
-
-		[[nodiscard]] bytes_t p_sign_data(const byte_span_const_t &data) const;
-		void p_load_public_key(const byte_span_const_t &public_key, const pgp_fingerprint_t &key_fingerprint);
+										   const byte_span_const_t &public_key, const sha256_hash_t *key_fingerprint);
 
 		std::unordered_map<std::string, SArchiveFile> m_files;
-
-		rnp_ffi_t m_ffi = nullptr;
-		rnp_key_handle_t m_signing_key = nullptr;
-		rnp_key_handle_t m_signing_public_key = nullptr;
-		std::string m_signing_key_passphrase;
+		bytes_t *m_signing_key;
 	};
 
 	inline SArchive &SArchive::operator+=(const SArchiveFile &file) {
@@ -425,7 +423,7 @@ namespace SArc {
 	}
 
 	inline std::ostream &operator<<(std::ostream &stream, const SArchive &archive) {
-		archive.serialise_to_stream(LZMA, 5, stream, 128 << 20, {}, void_progress_callback);
+		archive.serialise_to_stream(CompressionType::LZMA, 5, stream, 128 << 20, {}, void_progress_callback);
 		return stream;
 	}
 

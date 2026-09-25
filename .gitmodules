@@ -1,9 +1,6 @@
 [submodule "lib/CLI11"]
 	path = lib/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
-[submodule "lib/rnp"]
-	path = lib/rnp
-	url = https://github.com/rnpgp/rnp.git
 [submodule "lib/lz4"]
 	path = lib/lz4
 	url = https://github.com/lz4/lz4.git

@@ -5,7 +5,9 @@
 #include <span>
 
 namespace SArc::helpers {
-	class BytesStream : public std::streambuf {
+	SARC_ADD_RUNTIME_ERROR(crypto_error);
+
+	class SARC_API BytesStream : public std::streambuf {
 	public:
 		explicit BytesStream(bytes_t &buffer) : buffer_(buffer) {}
 	protected:
@@ -23,7 +25,7 @@ namespace SArc::helpers {
 		bytes_t &buffer_;
 	};
 
-	class ConstBytesStream : public std::streambuf {
+	class SARC_API ConstBytesStream : public std::streambuf {
 	public:
 		explicit ConstBytesStream(const bytes_t &buffer) {
 			auto *begin = reinterpret_cast<char *>(const_cast<std::byte *>(buffer.data()));
@@ -53,14 +55,14 @@ namespace SArc::helpers {
 		}
 	};
 
-	class BytesOStream : public std::ostream {
+	class SARC_API BytesOStream : public std::ostream {
 	public:
 		explicit BytesOStream(bytes_t &buffer) : std::ostream(&buf_), buf_(buffer) {}
 	private:
 		BytesStream buf_;
 	};
 
-	class BytesIStream : public std::istream {
+	class SARC_API BytesIStream : public std::istream {
 	public:
 		explicit BytesIStream(const bytes_t &buffer) : std::istream(&buf_), buf_(buffer) {}
 	private:
@@ -121,38 +123,42 @@ namespace SArc::helpers {
 		return static_cast<T>(value);
 	}
 
-	typedef struct {
-		bool valid;
-		pgp_fingerprint_t fingerprint;
-	} pgp_sigver_result_t;
+	[[nodiscard]] SARC_API std::string read_null_terminated_utf8(std::istream &stream);
 
-	[[nodiscard]] std::string read_null_terminated_utf8(std::istream &stream);
+	[[nodiscard]] SARC_API bytes_t read_file(const std::filesystem::path &path);
 
-	[[nodiscard]] bytes_t read_file(const std::filesystem::path &path);
+	[[nodiscard]] SARC_API file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
+														  const file_block_map_t &file_block_map);
+	[[nodiscard]] SARC_API file_block_map_t auto_mappings(std::vector<std::string> files,
+														  const std::vector<uint32_t> &file_sizes,
+														  uint32_t target_block_size,
+														  const file_block_map_t &file_block_map);
 
-	[[nodiscard]] file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
-												 const file_block_map_t &file_block_map);
-	[[nodiscard]] file_block_map_t auto_mappings(std::vector<std::string> files,
-												 const std::vector<uint32_t> &file_sizes, uint32_t target_block_size,
-												 const file_block_map_t &file_block_map);
+	[[nodiscard]] SARC_API bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
+	[[nodiscard]] SARC_API bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
 
-	[[nodiscard]] bytes_t lzma_compress(const byte_span_const_t &data, uint8_t level = 5);
-	[[nodiscard]] bytes_t lzma_decompress(const byte_span_const_t &data, size_t decompressed_size);
+	[[nodiscard]] SARC_API bytes_t lz4_compress(const byte_span_const_t &data, uint8_t level = 5);
+	[[nodiscard]] SARC_API bytes_t lz4_decompress(const byte_span_const_t &data, size_t decompressed_size);
 
-	[[nodiscard]] bytes_t lz4_compress(const byte_span_const_t &data, uint8_t level = 5);
-	[[nodiscard]] bytes_t lz4_decompress(const byte_span_const_t &data, size_t decompressed_size);
+	[[nodiscard]] SARC_API bytes_t oneshot_aes256_encrypt(const byte_span_const_t &data, const std::string &passphrase);
+	[[nodiscard]] SARC_API bytes_t oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase);
 
-	[[nodiscard]] bytes_t oneshot_aes256_encrypt(const byte_span_const_t &data, const std::string &passphrase);
-	[[nodiscard]] bytes_t oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase);
+	[[nodiscard]] SARC_API sha256_hash_t fingerprint_key(const byte_span_const_t &public_key);
 
-	[[nodiscard]] uint32_t calculate_crc32(const bytes_t &data);
+	[[nodiscard]] SARC_API bytes_t sign_data(const byte_span_const_t &data, const byte_span_const_t &private_key);
+	[[nodiscard]] SARC_API bytes_t sign_data(std::istream &stream, size_t length, const byte_span_const_t &private_key);
+	[[nodiscard]] SARC_API bool validate_signature(const byte_span_const_t &data, const byte_span_const_t &signature,
+												   const byte_span_const_t &public_key,
+												   const sha256_hash_t *fingerprint = nullptr);
 
-	void archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
-											uint8_t compression_level, std::ostream &stream,
-											const progress_callback_t &progress_callback);
+	[[nodiscard]] SARC_API uint32_t calculate_crc32(std::istream &stream, size_t len);
+	[[nodiscard]] SARC_API uint32_t calculate_crc32(const bytes_t &data);
+	[[nodiscard]] SARC_API std::array<std::byte, 32> calculate_sha256(std::istream &stream, size_t len);
 
-	[[nodiscard]] pgp_sigver_result_t verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
-																	std::istream &stream);
-	[[nodiscard]] pgp_fingerprint_t hex_str_to_fingerprint(const std::string &hex);
-	[[nodiscard]] std::string fingerprint_to_hex_str(const pgp_fingerprint_t &fingerprint);
+	void SARC_API archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
+													 uint8_t compression_level, std::ostream &stream,
+													 const progress_callback_t &progress_callback);
+
+	[[nodiscard]] SARC_API sha256_hash_t hex_str_to_fingerprint(const std::string &hex);
+	[[nodiscard]] SARC_API std::string fingerprint_to_hex_str(const sha256_hash_t &fingerprint);
 } // namespace SArc::helpers

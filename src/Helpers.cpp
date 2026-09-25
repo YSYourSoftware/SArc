@@ -8,8 +8,6 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
-#include <rnp/rnp.h>
-#include <rnp/rnp_err.h>
 
 #include <fstream>
 #include <iostream>
@@ -231,35 +229,79 @@ bytes_t helpers::oneshot_aes256_encrypt(const byte_span_const_t &data, const std
 	std::array<uint8_t, SHA256_DIGEST_LENGTH> hash{};
 	std::array<uint8_t, 16> aes_iv{};
 
+	bytes_t ciphertext;
+	ciphertext.resize(data.size());
+
 	RAND_bytes(aes_iv.data(), aes_iv.size());
 	SHA256(reinterpret_cast<const unsigned char *>(passphrase.c_str()), data.size(), hash.data());
 
 	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
 	EVP_EncryptInit(ctx, EVP_aes_256_cbc(), hash.data(), aes_iv.data());
 
-	std::array<uint8_t, 1204> ciphertext{};
-	int32_t len;
+	int32_t len = 0;
 
-	EVP_EncryptUpdate(ctx, ciphertext.data(), &len, reinterpret_cast<const unsigned char *>(data.data()), data.size());
-
-	int32_t ciphertext_len = len;
-
-	EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
-
-	ciphertext_len += len;
+	EVP_EncryptUpdate(ctx, reinterpret_cast<unsigned char *>(ciphertext.data()), &len,
+					  reinterpret_cast<const unsigned char *>(data.data()), data.size());
+	EVP_EncryptFinal_ex(ctx, reinterpret_cast<unsigned char *>(ciphertext.data() + len), &len);
 
 	EVP_CIPHER_CTX_free(ctx);
 
-	return {};
+	return ciphertext;
 }
 
 bytes_t helpers::oneshot_aes256_decrypt(const byte_span_const_t &data, const std::string &passphrase) {
 	throw std::runtime_error("Not implemented");
-	return {};
+}
+
+uint32_t helpers::calculate_crc32(std::istream &stream, const size_t len) {
+	return crc32strm(
+		[](void *userdata) -> char {
+			char buf;
+			static_cast<std::istream *>(userdata)->read(&buf, 1);
+			return buf;
+		},
+		len, &stream);
 }
 
 uint32_t helpers::calculate_crc32(const bytes_t &data) {
 	return crc32buf(reinterpret_cast<const char *>(data.data()), data.size());
+}
+
+std::array<std::byte, 32> helpers::calculate_sha256(std::istream &stream, const size_t len) {
+	EVP_MD_CTX *ctx = nullptr;
+
+	try {
+		ctx = EVP_MD_CTX_new();
+		SARC_RUNTIME_ASSERT(ctx, crypto_error, "Failed to create EVP MD context");
+
+		SARC_RUNTIME_ASSERT(EVP_DigestInit_ex2(ctx, EVP_sha256(), nullptr), crypto_error,
+							"Failed to initialise SHA256 MD context");
+
+		std::array<char, 256> buffer{};
+		std::array<std::byte, 32> digest{};
+
+		for (size_t i = 0; i < len / 256; i++) {
+			stream.read(buffer.data(), 256);
+
+			SARC_RUNTIME_ASSERT(EVP_DigestUpdate(ctx, buffer.data(), 256), crypto_error,
+								std::format("SHA256 failed at position {}", i * 256));
+		}
+
+		stream.read(buffer.data(), len % 256);
+		SARC_RUNTIME_ASSERT(EVP_DigestUpdate(ctx, buffer.data(), len % 256), crypto_error,
+							std::format("SHA256 failed at position {}", len - (len % 256)));
+
+		SARC_RUNTIME_ASSERT(EVP_DigestFinal_ex(ctx, reinterpret_cast<unsigned char *>(digest.data()), nullptr),
+							crypto_error, "Failed to finalise SHA256 hash");
+
+		EVP_MD_CTX_free(ctx);
+
+		return digest;
+	} catch (std::exception &) {
+		EVP_MD_CTX_free(ctx);
+
+		throw;
+	}
 }
 
 void helpers::archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
@@ -320,73 +362,6 @@ static bool read_stream(void *app_ctx, void *buf, size_t len, size_t *readres) {
 	return !stream->bad();
 }
 
-helpers::pgp_sigver_result_t helpers::verify_detached_pgg_signature(rnp_ffi_t ffi, const byte_span_const_t &signature,
-																	std::istream &stream) {
-	rnp_input_t data_input = nullptr;
-	rnp_input_t signature_input = nullptr;
-	rnp_op_verify_t verify = nullptr;
-
-	try {
-		SARC_RUNTIME_ASSERT(rnp_input_from_callback(&data_input, &read_stream, nullptr, &stream) == RNP_SUCCESS,
-							std::runtime_error, "Failed to read data from stream");
-		SARC_RUNTIME_ASSERT(rnp_input_from_memory(&signature_input, reinterpret_cast<const uint8_t *>(signature.data()),
-												  signature.size(), false) == RNP_SUCCESS,
-							std::runtime_error, "Failed to read signature data");
-
-		SARC_RUNTIME_ASSERT(rnp_op_verify_detached_create(&verify, ffi, data_input, signature_input) == RNP_SUCCESS,
-							ffi_error, "Failed to create detached verifier");
-
-		SARC_RUNTIME_ASSERT(rnp_op_verify_execute(verify) == RNP_SUCCESS, ffi_error,
-							"Failed to execute verification operation");
-
-		size_t signature_count = 0;
-		SARC_RUNTIME_ASSERT(rnp_op_verify_get_signature_count(verify, &signature_count) == RNP_SUCCESS, ffi_error,
-							"Failed to get signature count");
-
-		for (size_t i = 0; i < signature_count; i++) {
-			rnp_op_verify_signature_t s_verify_op = nullptr;
-
-			if (rnp_op_verify_get_signature_at(verify, i, &s_verify_op) != RNP_SUCCESS) continue;
-
-			if (rnp_op_verify_signature_get_status(s_verify_op) == RNP_SUCCESS) {
-				rnp_key_handle_t signing_key = nullptr;
-				char *fp_buf = nullptr;
-
-				SARC_RUNTIME_ASSERT(rnp_op_verify_signature_get_key(s_verify_op, &signing_key) == RNP_SUCCESS,
-									ffi_error, "Failed to get key from signature");
-
-				if (rnp_key_get_fprint(signing_key, &fp_buf) != RNP_SUCCESS) {
-					rnp_key_handle_destroy(signing_key);
-					throw invalid_gpg_data("Could not get fingerprint from signing key");
-				}
-
-				rnp_key_handle_destroy(signing_key);
-				rnp_op_verify_destroy(verify);
-				rnp_input_destroy(data_input);
-				rnp_input_destroy(signature_input);
-
-				const pgp_fingerprint_t fp = hex_str_to_fingerprint({fp_buf});
-
-				rnp_buffer_destroy(fp_buf);
-
-				return {true, fp};
-			}
-		}
-
-		rnp_op_verify_destroy(verify);
-		rnp_input_destroy(data_input);
-		rnp_input_destroy(signature_input);
-
-		return {false, {}};
-	} catch (const std::exception &e) {
-		rnp_op_verify_destroy(verify);
-		rnp_input_destroy(data_input);
-		rnp_input_destroy(signature_input);
-
-		throw;
-	}
-}
-
 static uint8_t hex_val(const char c) {
 	if ('0' <= c && c <= '9') return c - '0';
 	if ('a' <= c && c <= 'f') return c - 'a' + 10;
@@ -394,32 +369,32 @@ static uint8_t hex_val(const char c) {
 	throw std::invalid_argument("Invalid hex character");
 }
 
-pgp_fingerprint_t helpers::hex_str_to_fingerprint(const std::string &hex) {
-	SARC_RUNTIME_ASSERT(hex.length() == 40, std::invalid_argument, "Hex string not 40 chars long");
+sha256_hash_t helpers::hex_str_to_fingerprint(const std::string &hex) {
+	SARC_RUNTIME_ASSERT(hex.length() == 256 / 4, std::invalid_argument, "Hex string not 40 chars long");
 
-	pgp_fingerprint_t out{};
+	sha256_hash_t out{};
 
 	for (uint8_t i = 0; i < 20; i++) {
 		const uint8_t hi = hex_val(hex[2 * i]);
 		const uint8_t lo = hex_val(hex[2 * i + 1]);
-		out[i] = (hi << 4) | lo;
+		out[i] = static_cast<std::byte>((hi << 4) | lo);
 	}
 
 	return out;
 }
 
-std::string helpers::fingerprint_to_hex_str(const pgp_fingerprint_t &fingerprint) {
+std::string helpers::fingerprint_to_hex_str(const sha256_hash_t &fingerprint) {
 	static constexpr char hexmap[] = "0123456789ABCDEF";
 
 	std::string out;
-	out.resize(40);
+	out.resize(256 / 4);
 
-	const uint8_t *src = fingerprint.data();
+	const std::byte *src = fingerprint.data();
 
-	for (int i = 0; i < 20; i++) {
-		const uint8_t b = src[i];
-		out[2 * i] = hexmap[b >> 4];
-		out[2 * i + 1] = hexmap[b & 0x0F];
+	for (int i = 0; i < 256 / 8; i++) {
+		const std::byte b = src[i];
+		out[2 * i] = hexmap[static_cast<uint8_t>(b >> 4)];
+		out[2 * i + 1] = hexmap[static_cast<uint8_t>(b) & 0x0F];
 	}
 
 	return out;
