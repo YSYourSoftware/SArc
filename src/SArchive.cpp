@@ -157,7 +157,7 @@ void SArchiveMemory::p_load_from_serialised(const bytes_t &serialised, const boo
 
 static bool sarcmem_stream_verify_sig(std::istream &stream, const bool verify_signature,
 									  const byte_span_const_t &public_key) {
-	std::array<std::byte, 4> tempvar_buf;
+	std::array<std::byte, 4> tempvar_buf{};
 	stream.read(reinterpret_cast<char *>(tempvar_buf.data()), 2);
 	const auto signature_size = helpers::from_big_endian<uint16_t>(tempvar_buf);
 
@@ -200,9 +200,11 @@ static bool sarcmem_stream_verify_sig(std::istream &stream, const bool verify_si
 	}
 
 	stream.seekg(return_pos);
-	// TODO: streamd sigverify func
+	return helpers::validate_signature(stream, total_size, signature_data, public_key);
 }
 
+
+// TODO: this probably isn't up to date
 void SArchiveMemory::p_load_from_serialised_stream(std::istream &serialised, const bool verify_signature,
 												   const byte_span_const_t &public_key,
 												   const sha256_hash_t *key_fingerprint) {

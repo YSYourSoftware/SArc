@@ -150,6 +150,9 @@ namespace SArc::helpers {
 	[[nodiscard]] SARC_API bool validate_signature(const byte_span_const_t &data, const byte_span_const_t &signature,
 												   const byte_span_const_t &public_key,
 												   const sha256_hash_t *fingerprint = nullptr);
+	[[nodiscard]] SARC_API bool validate_signature(std::istream &stream, size_t length, const byte_span_const_t &signature,
+												   const byte_span_const_t &public_key,
+												   const sha256_hash_t *fingerprint = nullptr);
 
 	[[nodiscard]] SARC_API uint32_t calculate_crc32(std::istream &stream, size_t len);
 	[[nodiscard]] SARC_API uint32_t calculate_crc32(const bytes_t &data);

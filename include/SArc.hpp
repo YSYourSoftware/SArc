@@ -59,9 +59,7 @@ namespace SArc {
 	SARC_ADD_RUNTIME_ERROR(malformed_headers);
 	SARC_ADD_RUNTIME_ERROR(version_mismatch);
 
-	SARC_ADD_RUNTIME_ERROR(invalid_rsa_data);
 	SARC_ADD_RUNTIME_ERROR(invalid_signature);
-	SARC_ADD_RUNTIME_ERROR(sign_error);
 
 	class SARC_API SArchiveFile;
 
@@ -78,9 +76,9 @@ namespace SArc {
 	enum class CompressionType : uint8_t { NONE = 0, LZMA = 1, LZ4 = 2 };
 	enum class FeatureFlags : uint8_t { NONE = 0, RSA_SIGNATURE = 1, AES_ENCRYPTION = 2, RSA_ENCRYPTION = 4 };
 
-	inline SARC_API void void_progress_callback([[maybe_unused]] float progress,
+	inline void void_progress_callback([[maybe_unused]] float progress,
 												[[maybe_unused]] const std::string &message) {}
-	inline SARC_API void print_progress_callback(const float progress, const std::string &message) {
+	inline void print_progress_callback(const float progress, const std::string &message) {
 		std::printf("[%.2f%%] %s\n", progress * 100, message.c_str());
 	}
 
@@ -399,7 +397,7 @@ namespace SArc {
 		 * </summary>
 		 *
 		 * @param key Private RSA key
-		 * @throws invalid_rsa_data if the key failed to load
+		 * @throws crypto_error if the key failed to load
 		 */
 		void sign(const byte_span_const_t &key);
 	private:
@@ -409,7 +407,7 @@ namespace SArc {
 										   const byte_span_const_t &public_key, const sha256_hash_t *key_fingerprint);
 
 		std::unordered_map<std::string, SArchiveFile> m_files;
-		bytes_t *m_signing_key;
+		bytes_t *m_signing_key = nullptr;
 	};
 
 	inline SArchive &SArchive::operator+=(const SArchiveFile &file) {

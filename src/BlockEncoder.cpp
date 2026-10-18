@@ -86,11 +86,11 @@ static encoded_block_data sarcbenc_encode_block(const uint32_t decompressed_size
 	}
 
 	switch (compression_type) {
-	case NONE:
+	case CompressionType::NONE:
 		return {decompressed_data, helpers::calculate_crc32(decompressed_data)};
-	case LZMA:
+	case CompressionType::LZMA:
 		return {helpers::lzma_compress(decompressed_data, compression_level), helpers::calculate_crc32(decompressed_data)};
-	case LZ4:
+	case CompressionType::LZ4:
 		return {helpers::lz4_compress(decompressed_data, compression_level), helpers::calculate_crc32(decompressed_data)};
 	}
 }
@@ -101,12 +101,12 @@ void BlockEncoder::end_block(const CompressionType compression_type, const uint8
 						"Not enough files added");
 
 	switch (compression_type) {
-	case NONE: break;
-	case LZMA:
+	case CompressionType::NONE: break;
+	case CompressionType::LZMA:
 		SARC_RUNTIME_ASSERT(compression_level <= 9, std::invalid_argument,
 							"Compression level must satisfy 0 <= compresison_level <= 9 for LZMA");
 		break;
-	case LZ4:
+	case CompressionType::LZ4:
 		SARC_RUNTIME_ASSERT(compression_level <= 12, std::invalid_argument,
 							"Compression level must satisfy 0 <= compresison_level <= 12 for LZ4");
 		break;

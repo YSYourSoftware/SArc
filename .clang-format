@@ -38,10 +38,10 @@ ColumnLimit: 120
 CompactNamespaces: true
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 EmptyLineBeforeAccessModifier: Never
-IncludeCategories: 
-  - Regex: '^<.*'
-    Priority: 1
+IncludeCategories:
   - Regex: '^".*'
+    Priority: 1
+  - Regex: '^<.*'
     Priority: 2
   - Regex: '.*'
     Priority: 3

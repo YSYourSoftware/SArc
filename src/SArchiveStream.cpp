@@ -1,3 +1,6 @@
+// TODO: make streaming work again!!1
+
+/*
 #include "SArc/Streaming.hpp"
 
 #include "SArc/Helpers.hpp"
@@ -279,3 +282,4 @@ void SArchiveStream::p_load_public_key(const byte_span_const_t &public_key, cons
 	SARC_RUNTIME_ASSERT(rnp_locate_key(m_ffi, "fingerprint", fp_hex.c_str(), &m_signing_public_key) == RNP_SUCCESS,
 						invalid_gpg_data, "Failed to locate signing key by fingerprint");
 }
+*/

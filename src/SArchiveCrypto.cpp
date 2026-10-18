@@ -49,6 +49,10 @@ static sha256_hash_t fingerprint_evp_pkey(const EVP_PKEY *pkey) {
 	return helpers::calculate_sha256(bytes_istream, der_len);
 }
 
+void SArchiveMemory::sign(const byte_span_const_t &key) {
+	
+}
+
 sha256_hash_t helpers::fingerprint_key(const byte_span_const_t &public_key) {
 	EVP_PKEY *pkey = nullptr;
 
@@ -153,11 +157,13 @@ bytes_t helpers::sign_data(std::istream &stream, const size_t length, const byte
 
 		EVP_PKEY_free(signing_key);
 		EVP_PKEY_CTX_free(ctx);
+		EVP_MD_CTX_free(md_ctx);
 
 		return result;
 	} catch (std::exception &) {
 		EVP_PKEY_free(signing_key);
 		EVP_PKEY_CTX_free(ctx);
+		EVP_MD_CTX_free(md_ctx);
 
 		throw;
 	}
@@ -180,9 +186,9 @@ bool helpers::validate_signature(const byte_span_const_t &data, const byte_span_
 
 		ctx = EVP_PKEY_CTX_new(verify_key, nullptr);
 		SARC_RUNTIME_ASSERT(ctx, crypto_error, "Could not init EVP PKEY context");
-		SARC_RUNTIME_ASSERT(EVP_PKEY_sign_init(ctx) == 0, crypto_error, "Could not init context for signature");
-		SARC_RUNTIME_ASSERT(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) == 0 &&
-								EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) == 0,
+		SARC_RUNTIME_ASSERT(EVP_PKEY_sign_init(ctx), crypto_error, "Could not init context for signature");
+		SARC_RUNTIME_ASSERT(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) &&
+								EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING),
 							crypto_error, "Could not set context message digest or padding");
 
 		const int ret = EVP_PKEY_verify(ctx, reinterpret_cast<const uint8_t *>(signature.data()), signature.size(),
@@ -197,6 +203,50 @@ bool helpers::validate_signature(const byte_span_const_t &data, const byte_span_
 	} catch (std::exception &) {
 		EVP_PKEY_free(verify_key);
 		EVP_PKEY_CTX_free(ctx);
+
+		throw;
+	}
+}
+
+bool helpers::validate_signature(std::istream &stream, const size_t length, const byte_span_const_t &signature,
+								 const byte_span_const_t &public_key, const sha256_hash_t *fingerprint) {
+	EVP_PKEY *verify_key = nullptr;
+	EVP_PKEY_CTX *ctx = nullptr;
+	EVP_MD_CTX *md_ctx = nullptr;
+
+	try {
+		verify_key = load_der_pubkey(public_key);
+
+		if (fingerprint) {
+			if (fingerprint_evp_pkey(verify_key) != *fingerprint) {
+				EVP_PKEY_free(verify_key);
+				return false;
+			}
+		}
+
+
+		md_ctx = EVP_MD_CTX_new();
+		SARC_RUNTIME_ASSERT(md_ctx, memory_error, "Could not allocate digest context");
+
+		SARC_RUNTIME_ASSERT(EVP_DigestVerifyInit(md_ctx, &ctx, EVP_sha256(), nullptr, verify_key), crypto_error,
+							"Could not init context for signature");
+		SARC_RUNTIME_ASSERT(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING), crypto_error,
+							"Could not set RSA padding");
+
+		ctx = EVP_PKEY_CTX_new(verify_key, nullptr);
+		SARC_RUNTIME_ASSERT(ctx, crypto_error, "Could not init EVP PKEY context");
+		SARC_RUNTIME_ASSERT(EVP_PKEY_sign_init(ctx) == 0, crypto_error, "Could not init context for signature");
+		SARC_RUNTIME_ASSERT(EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) == 0 &&
+								EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) == 0,
+							crypto_error, "Could not set context message digest or padding");
+
+		EVP_PKEY_free(verify_key);
+		EVP_PKEY_CTX_free(ctx);
+		EVP_MD_CTX_free(md_ctx);
+	} catch (std::exception &) {
+		EVP_PKEY_free(verify_key);
+		EVP_PKEY_CTX_free(ctx);
+		EVP_MD_CTX_free(md_ctx);
 
 		throw;
 	}
