@@ -42,53 +42,6 @@ static std::string_view get_extension(const std::string &file) {
 	return std::string_view(file).substr(pos + 1);
 }
 
-file_block_map_t helpers::auto_mappings(const SArchive &archive, const uint32_t target_block_size,
-										const file_block_map_t &file_block_map) {
-	file_block_map_t result{file_block_map};
-
-	result.reserve(archive.get_all_paths().size());
-
-	uint8_t latest_block_files = 0;
-	uint32_t latest_block_size = 0;
-	uint32_t latest_block = 0;
-	for (const auto block : result | std::views::values)
-		if (block > latest_block) latest_block = block;
-
-	std::vector<std::string> files = archive.get_all_paths();
-	std::ranges::sort(files, [&](const std::string &a, const std::string &b) {
-		const std::string_view ext_a = get_extension(a);
-		const std::string_view ext_b = get_extension(b);
-
-		if (ext_a == ext_b) return a < b;
-
-		return ext_a < ext_b;
-	});
-
-	for (auto [path, file] : archive.const_iterate()) {
-		if (!result.contains(path)) {
-			uint64_t new_block_size = latest_block_size + file->data.size() + 4;
-
-			if (new_block_size > UINT32_MAX || latest_block_files >= UINT8_MAX) {
-				latest_block++;
-				latest_block_files = 0;
-				new_block_size = file->data.size() + 4;
-			}
-
-			result[path] = latest_block;
-			latest_block_size = new_block_size;
-
-			latest_block_files++;
-
-			if (latest_block_size >= target_block_size) {
-				latest_block++;
-				latest_block_size = 0;
-			}
-		}
-	}
-
-	return result;
-}
-
 file_block_map_t helpers::auto_mappings(std::vector<std::string> files, const std::vector<uint32_t> &file_sizes,
 										const uint32_t target_block_size, const file_block_map_t &file_block_map) {
 	file_block_map_t result{file_block_map};
@@ -302,64 +255,6 @@ std::array<std::byte, 32> helpers::calculate_sha256(std::istream &stream, const 
 
 		throw;
 	}
-}
-
-void helpers::archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
-												 const uint8_t compression_level, std::ostream &stream,
-												 const progress_callback_t &progress_callback) {
-	uint32_t block_count = 0;
-	for (const auto block : file_block_map | std::views::values)
-		if (block >= block_count) block_count = block + 1;
-
-	for (uint32_t block = 0; block < block_count; block++) {
-		std::vector<std::string> paths;
-		paths.reserve(255);
-
-		for (const auto &[path, f_block] : file_block_map)
-			if (f_block == block) paths.push_back(path);
-
-		paths.shrink_to_fit();
-
-		uint8_t temp = paths.size();
-		stream.write(reinterpret_cast<const char *>(&temp), 1);
-
-		uint32_t block_uncompressed_size = 0;
-
-		for (const auto &path : paths) {
-			block_uncompressed_size += archive[path]->get_serialised_size();
-
-			stream.write(path.c_str(), path.size() + 1);
-		}
-
-		bytes_t block_data;
-		block_data.reserve(block_uncompressed_size);
-		for (const auto &path : paths) {
-			const SArchiveFile *file = archive[path];
-			file->serialise_append(block_data);
-		}
-
-		stream.write(
-			reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(calculate_crc32(block_data)).data()), 4);
-
-		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(block_data.size()).data()), 4);
-
-		progress_callback(block / (block_count + 1.f), std::format("Compressing block {}/{}", block + 1, block_count));
-		bytes_t compressed = lzma_compress(block_data, compression_level);
-
-		stream.write(reinterpret_cast<const char *>(helpers::to_big_endian<uint32_t>(compressed.size()).data()), 4);
-		stream.write(reinterpret_cast<const char *>(compressed.data()), compressed.size());
-	}
-
-	progress_callback(1.f, "Serialised all blocks");
-}
-
-static bool read_stream(void *app_ctx, void *buf, size_t len, size_t *readres) {
-	auto *stream = static_cast<std::istream *>(app_ctx);
-
-	stream->read(static_cast<char *>(buf), len);
-	*readres = static_cast<size_t>(stream->gcount());
-
-	return !stream->bad();
 }
 
 static uint8_t hex_val(const char c) {

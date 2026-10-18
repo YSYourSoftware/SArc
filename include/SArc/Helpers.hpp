@@ -127,8 +127,6 @@ namespace SArc::helpers {
 
 	[[nodiscard]] SARC_API bytes_t read_file(const std::filesystem::path &path);
 
-	[[nodiscard]] SARC_API file_block_map_t auto_mappings(const SArchive &archive, uint32_t target_block_size,
-														  const file_block_map_t &file_block_map);
 	[[nodiscard]] SARC_API file_block_map_t auto_mappings(std::vector<std::string> files,
 														  const std::vector<uint32_t> &file_sizes,
 														  uint32_t target_block_size,
@@ -157,10 +155,6 @@ namespace SArc::helpers {
 	[[nodiscard]] SARC_API uint32_t calculate_crc32(std::istream &stream, size_t len);
 	[[nodiscard]] SARC_API uint32_t calculate_crc32(const bytes_t &data);
 	[[nodiscard]] SARC_API std::array<std::byte, 32> calculate_sha256(std::istream &stream, size_t len);
-
-	void SARC_API archive_serialise_blocks_to_stream(const SArchive &archive, const file_block_map_t &file_block_map,
-													 uint8_t compression_level, std::ostream &stream,
-													 const progress_callback_t &progress_callback);
 
 	[[nodiscard]] SARC_API sha256_hash_t hex_str_to_fingerprint(const std::string &hex);
 	[[nodiscard]] SARC_API std::string fingerprint_to_hex_str(const sha256_hash_t &fingerprint);

@@ -1,23 +1,9 @@
-if(SARC_BUILD_EXEC)
-	set(CLI11_TESTING OFF)
-	add_subdirectory(CLI11)
-
-	target_link_libraries(SArcC PRIVATE CLI11::CLI11)
-	target_include_directories(SArcC PRIVATE CLI11/include)
-
-	target_link_libraries(SArcU PRIVATE CLI11::CLI11)
-	target_include_directories(SArcU PRIVATE CLI11/include)
-
-	target_link_libraries(SArcInfo PRIVATE CLI11::CLI11)
-	target_include_directories(SArcInfo PRIVATE CLI11/include)
-endif()
-
 find_package(OpenSSL CONFIG REQUIRED)
-target_link_libraries(SArc PRIVATE
+target_link_libraries(SArcHelpers PRIVATE
 	OpenSSL::Crypto
 )
 
-target_sources(SArc PRIVATE
+target_sources(SArcHelpers PRIVATE
 	ccrc/crc_32.c
 
 	lz4/lib/lz4.c
@@ -34,7 +20,7 @@ target_sources(SArc PRIVATE
 	lzma/Threads.c
 )
 
-target_include_directories(SArc PRIVATE
+target_include_directories(SArcHelpers PRIVATE
 	ccrc
 	lz4/lib
 	lzma
