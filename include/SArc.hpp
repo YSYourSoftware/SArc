@@ -6,21 +6,26 @@
 #include <span>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
+#ifdef SARC_SHARED
 #ifdef SARC_IN_SARC_BUILD
 #ifdef WIN32
 #define SARC_API __declspec(dllexport)
 #elif __GNUC__ || __clang__
-#define SARC_API [[gnu::dllexport]]
+#define SARC_API __attribute__((visibility("default")))
+#else
+#define SARC_API
 #endif
 #else
 #ifdef WIN32
 #define SARC_API __declspec(dllimport)
-#elif __GNUC__ || __clang__
-#define SARC_API [[gnu::dllimport]]
+#else
+#define SARC_API
 #endif
+#endif
+#else
+#define SARC_API
 #endif
 
 #define SARC_ADD_RUNTIME_ERROR(name)                                                                                   \

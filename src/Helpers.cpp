@@ -13,7 +13,22 @@
 #include <iostream>
 #include <ranges>
 
+#ifdef SARC_USE_IPP
+#include <ipp.h>
+#elifdef SARC_USE_AAC
+#include <Accelerate/Accelerate.h>
+#endif
+
 using namespace SArc;
+
+#ifdef SARC_USE_IPP
+#define SARC_IPP_CHECK(call)                                                                                           \
+	do {                                                                                                               \
+		const IppStatus status = call;                                                                                 \
+		SARC_RUNTIME_ASSERT(status == ippStsNoErr, std::runtime_error,                                                 \
+							std::format("IPP: {}", ippGetStatusString(status)));                                       \
+	} while (false)
+#endif
 
 std::string helpers::read_null_terminated_utf8(std::istream &stream) {
 	std::string result;
@@ -141,6 +156,9 @@ file_block_map_t helpers::auto_mappings(std::vector<std::string> files, const st
 bytes_t helpers::lzma_compress(const byte_span_const_t &data, const uint8_t level) {
 	size_t compressed_size = data.size() + data.size() / 3 + 128;
 
+#ifdef SARC_USE_AAC
+	// Apple Accelerate (https://developer.apple.com/documentation/compression/compression_lzma?language=objc)
+#else
 	uint8_t props[LZMA_PROPS_SIZE];
 	size_t props_size = LZMA_PROPS_SIZE;
 
@@ -171,6 +189,7 @@ bytes_t helpers::lzma_compress(const byte_span_const_t &data, const uint8_t leve
 	std::memcpy(compressed.data(), props, props_size);
 
 	return compressed;
+#endif
 }
 
 bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t decompressed_size) {
@@ -179,6 +198,9 @@ bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t dec
 
 	bytes_t decompressed(dc_size);
 
+#ifdef SARC_USE_AAC
+// https://developer.apple.com/documentation/compression/compression_decode_buffer(_:_:_:_:_:_:)?language=objc
+#else
 	const int result = LzmaUncompress(reinterpret_cast<Byte *>(decompressed.data()), &dc_size,
 									  reinterpret_cast<const Byte *>(data.data() + LZMA_PROPS_SIZE), &c_size,
 									  reinterpret_cast<const Byte *>(data.data()), LZMA_PROPS_SIZE);
@@ -188,28 +210,89 @@ bytes_t helpers::lzma_decompress(const byte_span_const_t &data, const size_t dec
 	if (result == SZ_ERROR_UNSUPPORTED) throw std::invalid_argument("LZMA: Unsupported properties");
 	if (result == SZ_ERROR_INPUT_EOF) throw memory_error("LZMA: Input vector too small");
 	if (result != SZ_OK) throw std::runtime_error("LZMA: Unknown error in decompression");
-
+#endif
 	return decompressed;
 }
+
+#ifdef SARC_USE_IPP
+namespace SArc::helpers {
+	class IPPMemoryAutoFree {
+	public:
+		explicit IPPMemoryAutoFree(const IppSizeL size) {
+			data = ippsMalloc_8u_L(size);
+			SARC_RUNTIME_ASSERT(data, std::runtime_error, "IPP allocation failed");
+		}
+
+		~IPPMemoryAutoFree() { ippsFree(data); }
+
+		uint8_t *data;
+	};
+} // namespace SArc::helpers
+#endif
 
 bytes_t helpers::lz4_compress(const byte_span_const_t &data, const uint8_t level) {
 	bytes_t result;
 	result.resize(LZ4_compressBound(data.size()));
 
+#ifdef SARC_USE_IPP
 	if (level < 5) {
-		const int32_t size =
-			LZ4_compress_fast(reinterpret_cast<const char *>(data.data()), reinterpret_cast<char *>(result.data()),
-							  data.size(), result.size(), level == 0 ? 17 : std::roundf(level / 5.f * 17.f));
+		int hash_table_size;
+		SARC_IPP_CHECK(ippsEncodeLZ4HashTableGetSize_8u(&hash_table_size));
+
+		const IPPMemoryAutoFree hash_table{hash_table_size};
+		SARC_RUNTIME_ASSERT(hash_table.data, std::runtime_error, "Count not allocate LZ4 hash table for IPP");
+		SARC_IPP_CHECK(ippsEncodeLZ4HashTableInit_8u(hash_table.data, data.size()));
+
+		int result_size = result.size();
+
+		SARC_IPP_CHECK(ippsEncodeLZ4Fast_8u(reinterpret_cast<const uint8_t *>(data.data()), data.size(),
+											reinterpret_cast<uint8_t *>(result.data()), &result_size, hash_table.data,
+											level == 0 ? 17 : std::roundf(level / 5.f * 17.f)));
+
+		result.resize(result_size);
+		result.shrink_to_fit();
+	} else {
+		int hash_table_size;
+		int prev_table_size;
+		SARC_IPP_CHECK(ippsEncodeLZ4HCHashTableGetSize_8u(&hash_table_size, &prev_table_size));
+
+		const IPPMemoryAutoFree hash_table{hash_table_size};
+		const IPPMemoryAutoFree prev_table{prev_table_size};
+
+		uint8_t *tables[2] = {hash_table.data, prev_table.data};
+		SARC_IPP_CHECK(ippsEncodeLZ4HCHashTableInit_8u(tables));
+
+		int data_length = data.size();
+		int result_size = result.size();
+
+		SARC_IPP_CHECK(ippsEncodeLZ4HC_8u(reinterpret_cast<const uint8_t *>(data.data()), 0, &data_length,
+										  reinterpret_cast<uint8_t *>(result.data()), &result_size, tables, nullptr, 0,
+										  level));
+
+		result.resize(result_size);
+		result.shrink_to_fit();
+	}
+#elifdef SARC_USE_AAC
+	// Apple Accelerate stuff (https://developer.apple.com/documentation/compression/compression_lz4_raw?language=objc)
+#else
+	if (level < 5) {
+		const int32_t size = LZ4_compress_fast(reinterpret_cast<const uint8_t *>(data.data()),
+											   reinterpret_cast<uint8_t *>(result.data()), data.size(), result.size(),
+											   level == 0 ? 17 : std::roundf(level / 5.f * 17.f));
 		SARC_RUNTIME_ASSERT(size > 0, std::runtime_error, "LZ4: Error in compression");
+
 		result.resize(size);
+		result.shrink_to_fit();
 	} else {
 		const int32_t size =
-			LZ4_compress_HC(reinterpret_cast<const char *>(data.data()), reinterpret_cast<char *>(result.data()),
+			LZ4_compress_HC(reinterpret_cast<const uint8_t *>(data.data()), reinterpret_cast<uint8_t *>(result.data()),
 							data.size(), result.size(), level);
 		SARC_RUNTIME_ASSERT(size > 0, std::runtime_error, "LZ4HC: Error in compression");
-		result.resize(size);
-	}
 
+		result.resize(size);
+		result.shrink_to_fit();
+	}
+#endif
 	return result;
 }
 
@@ -217,11 +300,21 @@ bytes_t helpers::lz4_decompress(const byte_span_const_t &data, const size_t deco
 	bytes_t result;
 	result.resize(decompressed_size);
 
+#ifdef SARC_USE_IPP
+	int result_size = decompressed_size;
+	ippsDecodeLZ4_8u(reinterpret_cast<const uint8_t *>(data.data()), data.size(),
+					 reinterpret_cast<uint8_t *>(result.data()), &result_size);
+
+	result.resize(result_size);
+	result.shrink_to_fit();
+#elifdef SARC_USE_AAC
+	// https://developer.apple.com/documentation/compression/compression_decode_buffer(_:_:_:_:_:_:)?language=objc
+#else
 	SARC_RUNTIME_ASSERT(LZ4_decompress_safe(reinterpret_cast<const char *>(data.data()),
 											reinterpret_cast<char *>(result.data()), data.size(),
 											result.size()) == decompressed_size,
 						std::runtime_error, "LZ4: Error in decompression");
-
+#endif
 	return result;
 }
 
