@@ -484,7 +484,7 @@ std::string helpers::fingerprint_to_hex_str(const sha256_hash_t &fingerprint) {
 
 	const std::byte *src = fingerprint.data();
 
-	for (int i = 0; i < 256 / 8; i++) {
+	for (int i = 0; i < 256 / 2; i++) {
 		const std::byte b = src[i];
 		out[2 * i] = hexmap[static_cast<uint8_t>(b >> 4)];
 		out[2 * i + 1] = hexmap[static_cast<uint8_t>(b) & 0x0F];
