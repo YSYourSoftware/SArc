@@ -1,9 +1,7 @@
 #include "SArc/Helpers.hpp"
 
-#include <LzmaLib.h>
 #include <crc.h>
 #include <lz4.h>
-#include <lz4hc.h>
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -14,9 +12,13 @@
 #include <ranges>
 
 #ifdef SARC_USE_IPP
+#include <LzmaLib.h>
 #include <ipp.h>
 #elifdef SARC_USE_AAC
 #include <Accelerate/Accelerate.h>
+#else
+#include <LzmaLib.h>
+#include <lz4hc.h>
 #endif
 
 using namespace SArc;
