@@ -463,7 +463,7 @@ static uint8_t hex_val(const char c) {
 }
 
 sha256_hash_t helpers::hex_str_to_fingerprint(const std::string &hex) {
-	SARC_RUNTIME_ASSERT(hex.length() == 256 / 4, std::invalid_argument, "Hex string not 40 chars long");
+	SARC_RUNTIME_ASSERT(hex.length() == 256 / 4, std::invalid_argument, "Hex string not 64 chars long");
 
 	sha256_hash_t out{};
 
